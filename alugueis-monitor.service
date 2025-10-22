@@ -1,0 +1,15 @@
+[Unit]
+Description=Sistema de Aluguéis V4 Monitor
+After=network.target docker.service
+Requires=docker.service
+
+[Service]
+Type=simple
+User=mloco
+WorkingDirectory=/home/mloco/Escritorio/AlugueisV4
+ExecStart=/home/mloco/Escritorio/AlugueisV4/monitor.sh
+Restart=always
+RestartSec=60
+
+[Install]
+WantedBy=multi-user.target

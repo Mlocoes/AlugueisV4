@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Relatórios - Sistema de Aluguéis{% endblock %}
+
+{% block content %}
+<div class="min-h-screen bg-gray-50">
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+        <div class="px-4 py-6 sm:px-0">
+            <!-- Header da Página -->
+            <div class="md:flex md:items-center md:justify-between mb-6">
+                <div class="min-w-0 flex-1">
+                    <h2 class="text-2xl font-bold leading-7 text-gray-900 sm:truncate sm:text-3xl sm:tracking-tight">
+                        Relatórios e Análises
+                    </h2>
+                </div>
+            </div>
+
+            <!-- Filtros de Relatório -->
+            <div class="bg-white shadow rounded-lg mb-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div>
+                            <label for="report-type" class="block text-sm font-medium text-gray-700">Tipo de Relatório</label>
+                            <select id="report-type" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                                <option value="receitas">Receitas por Período</option>
+                                <option value="proprietarios">Receitas por Proprietário</option>
+                                <option value="imoveis">Performance de Imóveis</option>
+                                <option value="alugueis">Aluguéis Ativos</option>
+                                <option value="inadimplencia">Inadimplência</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="date-from" class="block text-sm font-medium text-gray-700">Data Inicial</label>
+                            <input type="date" id="date-from" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="date-to" class="block text-sm font-medium text-gray-700">Data Final</label>
+                            <input type="date" id="date-to" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+                        <div class="flex items-end">
+                            <button id="generate-report-btn" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
+                                <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fill-rule="evenodd" d="M3 3a1 1 0 000 2v8a2 2 0 002 2h2.586l-1.293 1.293a1 1 0 101.414 1.414L10 15.414l2.293 2.293a1 1 0 001.414-1.414L12.414 15H15a2 2 0 002-2V5a1 1 0 100-2H3zm11.707 4.707a1 1 0 00-1.414-1.414L10 9.586 8.707 8.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                                </svg>
+                                Gerar Relatório
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Área de Resultados -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Gráfico do Relatório -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4" id="chart-title">Gráfico do Relatório</h3>
+                    <canvas id="report-chart" width="400" height="300"></canvas>
+                </div>
+
+                <!-- Tabela de Dados -->
+                <div class="bg-white shadow rounded-lg p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4" id="table-title">Dados do Relatório</h3>
+                    <div id="report-table" class="handsontable-container"></div>
+                </div>
+            </div>
+
+            <!-- Resumo Estatístico -->
+            <div class="bg-white shadow rounded-lg mt-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Resumo Estatístico</h3>
+                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-gray-500">Total Receitas</div>
+                            <div class="text-2xl font-bold text-gray-900" id="total-receitas">R$ 0,00</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-gray-500">Receitas Médias</div>
+                            <div class="text-2xl font-bold text-gray-900" id="receitas-medias">R$ 0,00</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-gray-500">Taxa de Ocupação</div>
+                            <div class="text-2xl font-bold text-gray-900" id="taxa-ocupacao">0%</div>
+                        </div>
+                        <div class="bg-gray-50 p-4 rounded-lg">
+                            <div class="text-sm font-medium text-gray-500">Inadimplência</div>
+                            <div class="text-2xl font-bold text-gray-900" id="inadimplencia">0%</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Botões de Exportação -->
+            <div class="bg-white shadow rounded-lg mt-6">
+                <div class="px-4 py-5 sm:p-6">
+                    <h3 class="text-lg font-medium text-gray-900 mb-4">Exportar Relatório</h3>
+                    <div class="flex space-x-4">
+                        <button id="export-pdf-btn" class="inline-flex items-center rounded-md bg-red-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-red-500">
+                            <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                            </svg>
+                            Exportar PDF
+                        </button>
+                        <button id="export-excel-btn" class="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-green-500">
+                            <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd"/>
+                            </svg>
+                            Exportar Excel
+                        </button>
+                        <button id="export-csv-btn" class="inline-flex items-center rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
+                            <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586 11.293 8.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd"/>
+                            </svg>
+                            Exportar CSV
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+</div>
+
+<script src="/static/js/lib/chart.min.js"></script>
+<script src="/static/js/lib/handsontable.full.min.js"></script>
+<script src="/static/js/relatorios.js"></script>
+{% endblock %}
