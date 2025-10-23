@@ -15,6 +15,7 @@ except Exception:
 
 from io import BytesIO
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models.usuario import Usuario
 from app.models.imovel import Imovel
 from app.models.aluguel import AluguelMensal
@@ -306,6 +307,9 @@ class ImportacaoAvancadaService:
                     ).first()
 
                     if not imovel:
+                        # Tentar buscar por endereço também
+                        imovel = db.query(Imovel).filter(Imovel.endereco.ilike(f'%{nome_imovel}%')).first()
+                    if not imovel:
                         # Listar imóveis similares para debug
                         imoveis_similares = db.query(Imovel).filter(
                             Imovel.nome.ilike(f"%{nome_imovel.split()[0]}%")
@@ -477,4 +481,179 @@ class ImportacaoAvancadaService:
                     break
         
         return mapeamento
+
+    def importar_alugueis(self, file_content: bytes, db: Session) -> Dict[str, Any]:
+        """Importa aluguéis mensais de múltiplas planilhas Excel"""
+        try:
+            xl = pd.ExcelFile(BytesIO(file_content))
+            registros_importados = 0
+            erros = []
+
+            for sheet_name in xl.sheet_names:
+                try:
+                    df = pd.read_excel(xl, sheet_name=sheet_name, header=None)
+                    
+                    # Verificar se há dados suficientes
+                    if df.empty or len(df) < 2:
+                        erros.append(f"Planilha '{sheet_name}': Dados insuficientes")
+                        continue
+                    
+                    # Extrair data de referência da célula A1
+                    data_ref_str = str(df.iloc[0, 0]).strip()
+                    try:
+                        # Converter formato brasileiro DD/MM/YYYY para date
+                        data_referencia = datetime.strptime(data_ref_str, '%d/%m/%Y').date()
+                    except ValueError:
+                        erros.append(f"Planilha '{sheet_name}': Data inválida '{data_ref_str}'")
+                        continue
+                    
+                    # Usar a linha 1 como cabeçalhos
+                    df.columns = df.iloc[1]
+                    df = df[2:]  # Pular as duas primeiras linhas (data e cabeçalhos)
+                    
+                    # Remover linhas vazias
+                    df = df.dropna(how='all')
+                    
+                    if df.empty:
+                        continue
+                    
+                    # Identificar colunas
+                    colunas = list(df.columns)
+                    
+                    # Encontrar índices das colunas importantes
+                    imovel_col = None
+                    valor_total_col = None
+                    taxa_admin_col = None
+                    
+                    for i, col in enumerate(colunas):
+                        col_str = str(col).lower().strip()
+                        if 'imóvel' in col_str or 'endereço' in col_str or 'imovel' in col_str:
+                            imovel_col = i
+                        elif 'valor total' in col_str:
+                            valor_total_col = i
+                        elif 'taxa' in col_str and 'admin' in col_str:
+                            taxa_admin_col = i
+                    
+                    if imovel_col is None or valor_total_col is None:
+                        erros.append(f"Planilha '{sheet_name}': Colunas obrigatórias não encontradas")
+                        continue
+                    
+                    # Identificar colunas de proprietários (todas exceto as especiais)
+                    proprietario_cols = []
+                    for i, col in enumerate(colunas):
+                        if i not in [imovel_col, valor_total_col, taxa_admin_col]:
+                            proprietario_cols.append((i, str(col).strip()))
+                    
+                    # Processar cada linha (imóvel)
+                    for idx, row in df.iterrows():
+                        try:
+                            imovel_nome = str(row.iloc[imovel_col]).strip()
+                            if not imovel_nome or imovel_nome.lower() == 'nan':
+                                continue
+                            
+                            # Buscar imóvel por nome
+                            from app.models.imovel import Imovel
+                            imovel = db.query(Imovel).filter(Imovel.nome.ilike(f'%{imovel_nome}%')).first()
+                            if not imovel:
+                                # Tentar buscar por endereço também
+                                imovel = db.query(Imovel).filter(Imovel.endereco.ilike(f'%{imovel_nome}%')).first()
+                            if not imovel:
+                                erros.append(f"Linha {idx+2} planilha '{sheet_name}': Imóvel '{imovel_nome}' não encontrado")
+                                continue
+                            
+                            # Valor total do aluguel
+                            valor_total_str = str(row.iloc[valor_total_col]).replace('R$', '').replace('.', '').replace(',', '.').strip()
+                            try:
+                                valor_total = Decimal(valor_total_str.replace('-', '').strip())
+                                if '-' in str(row.iloc[valor_total_col]):
+                                    valor_total = -valor_total
+                            except:
+                                erros.append(f"Linha {idx+2} planilha '{sheet_name}': Valor total inválido")
+                                continue
+                            
+                            # Taxa de administração (opcional)
+                            taxa_admin = Decimal('0')
+                            if taxa_admin_col is not None:
+                                taxa_str = str(row.iloc[taxa_admin_col]).replace('R$', '').replace('.', '').replace(',', '.').strip()
+                                try:
+                                    taxa_admin = Decimal(taxa_str.replace('-', '').strip())
+                                    if '-' in str(row.iloc[taxa_admin_col]):
+                                        taxa_admin = -taxa_admin
+                                except:
+                                    pass  # Usar valor padrão
+                            
+                            # Processar valores por proprietário
+                            for col_idx, prop_nome in proprietario_cols:
+                                valor_prop_str = str(row.iloc[col_idx]).strip()
+                                if valor_prop_str.lower() in ['nan', 'none', '']:
+                                    continue
+                                
+                                # Limpar valor
+                                valor_prop_str = valor_prop_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
+                                try:
+                                    valor_proprietario = Decimal(valor_prop_str.replace('-', '').strip())
+                                    if '-' in valor_prop_str:
+                                        valor_proprietario = -valor_proprietario
+                                except:
+                                    continue
+                                
+                                # Buscar proprietário
+                                from app.models.usuario import Usuario
+                                proprietario = db.query(Usuario).filter(
+                                    Usuario.nome.ilike(f'%{prop_nome}%'),
+                                    Usuario.tipo == 'proprietario'
+                                ).first()
+                                
+                                if not proprietario:
+                                    erros.append(f"Linha {idx+2} planilha '{sheet_name}': Proprietário '{prop_nome}' não encontrado")
+                                    continue
+                                
+                                # Verificar se já existe registro para este mês/proprietário/imóvel
+                                existing = db.query(AluguelMensal).filter(
+                                    AluguelMensal.id_imovel == imovel.id,
+                                    AluguelMensal.id_proprietario == proprietario.id,
+                                    AluguelMensal.data_referencia == data_referencia
+                                ).first()
+                                
+                                if existing:
+                                    # Atualizar
+                                    existing.valor_total = valor_total
+                                    existing.valor_proprietario = valor_proprietario
+                                    existing.taxa_administracao = taxa_admin
+                                    existing.atualizado_em = func.now()
+                                else:
+                                    # Criar novo
+                                    novo_aluguel = AluguelMensal(
+                                        id_imovel=imovel.id,
+                                        id_proprietario=proprietario.id,
+                                        data_referencia=data_referencia,
+                                        valor_total=valor_total,
+                                        valor_proprietario=valor_proprietario,
+                                        taxa_administracao=taxa_admin
+                                    )
+                                    db.add(novo_aluguel)
+                                
+                                registros_importados += 1
+                        
+                        except Exception as e:
+                            erros.append(f"Linha {idx+2} planilha '{sheet_name}': Erro ao processar - {str(e)}")
+                
+                except Exception as e:
+                    erros.append(f"Planilha '{sheet_name}': Erro geral - {str(e)}")
+            
+            db.commit()
+            
+            return {
+                'success': True,
+                'message': f'Importação concluída. {registros_importados} registros de aluguel importados.',
+                'registros_importados': registros_importados,
+                'erros': erros
+            }
+        
+        except Exception as e:
+            db.rollback()
+            return {
+                'success': False,
+                'message': f'Erro na importação: {str(e)}'
+            }
 
