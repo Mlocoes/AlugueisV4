@@ -138,24 +138,24 @@ class ParticipacoesManager {
             }
 
             const data = participacoes.map(part => {
-                const imovel = this.imoveis.find(i => i.id === part.imovel_id);
-                const proprietario = this.proprietarios.find(p => p.id === part.proprietario_id);
+                const imovel = this.imoveis.find(i => i.id === part.id_imovel);
+                const proprietario = this.proprietarios.find(p => p.id === part.id_proprietario);
 
                 return [
                     part.id,
-                    imovel ? `${imovel.endereco} - ${imovel.cidade}` : 'N/A',
+                    imovel ? `${imovel.nome}` : 'N/A',
                     proprietario ? proprietario.nome : 'N/A',
-                    `${part.percentual}%`,
-                    new Date(part.data_inicio).toLocaleDateString('pt-BR'),
-                    part.data_fim ? new Date(part.data_fim).toLocaleDateString('pt-BR') : 'N/A',
-                    part.ativo ? 'Ativo' : 'Inativo',
+                    `${part.participacao}%`,
+                    new Date(part.data_cadastro).toLocaleDateString('pt-BR'),
+                    'N/A', // Data fim não existe no modelo
+                    'Ativo', // Status fixo por enquanto
                     'Editar | Excluir'
                 ];
             });
 
             this.participacoesTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Percentual', 'Data Início', 'Data Fim', 'Status', 'Ações'],
+                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Participação', 'Data Cadastro', 'Data Fim', 'Status', 'Ações'],
                 columns: [
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
@@ -270,17 +270,17 @@ class ParticipacoesManager {
         }
         
         const data = participacoes.map(part => {
-            const imovel = this.imoveis.find(i => i.id === part.imovel_id);
-            const proprietario = this.proprietarios.find(p => p.id === part.proprietario_id);
+            const imovel = this.imoveis.find(i => i.id === part.id_imovel);
+            const proprietario = this.proprietarios.find(p => p.id === part.id_proprietario);
 
             return [
                 part.id,
-                imovel ? `${imovel.endereco} - ${imovel.cidade}` : 'N/A',
+                imovel ? `${imovel.nome}` : 'N/A',
                 proprietario ? proprietario.nome : 'N/A',
-                `${part.percentual}%`,
-                new Date(part.data_inicio).toLocaleDateString('pt-BR'),
-                part.data_fim ? new Date(part.data_fim).toLocaleDateString('pt-BR') : 'N/A',
-                part.ativo ? 'Ativo' : 'Inativo',
+                `${part.participacao}%`,
+                new Date(part.data_cadastro).toLocaleDateString('pt-BR'),
+                'N/A', // Data fim não existe no modelo
+                'Ativo', // Status fixo por enquanto
                 'Editar | Excluir'
             ];
         });
@@ -297,16 +297,16 @@ class ParticipacoesManager {
         if (participacao) {
             title.textContent = 'Editar Participação';
             form['id'].value = participacao.id;
-            form['imovel_id'].value = participacao.imovel_id;
-            form['proprietario_id'].value = participacao.proprietario_id;
-            form['percentual'].value = participacao.percentual;
-            form['data_inicio'].value = new Date(participacao.data_inicio).toISOString().split('T')[0];
-            form['data_fim'].value = participacao.data_fim ? new Date(participacao.data_fim).toISOString().split('T')[0] : '';
-            form['ativo'].checked = participacao.ativo;
+            form['imovel_id'].value = participacao.id_imovel;
+            form['proprietario_id'].value = participacao.id_proprietario;
+            form['percentual'].value = participacao.participacao;
+            form['data_cadastro'].value = new Date(participacao.data_cadastro).toISOString().split('T')[0];
         } else {
             title.textContent = 'Nova Participação';
             form.reset();
             form['id'].value = '';
+            // Definir data atual como padrão
+            form['data_cadastro'].value = new Date().toISOString().split('T')[0];
         }
 
         modal.classList.remove('hidden');
@@ -327,7 +327,7 @@ class ParticipacoesManager {
             id_imovel: parseInt(formData.get('imovel_id')),
             id_proprietario: parseInt(formData.get('proprietario_id')),
             participacao: parseFloat(formData.get('percentual')),
-            data_cadastro: new Date().toISOString().split('T')[0] // Data atual no formato YYYY-MM-DD
+            data_cadastro: formData.get('data_cadastro') || new Date().toISOString().split('T')[0]
         };
 
         try {
