@@ -79,6 +79,7 @@ class AlugueisManager {
     async loadData() {
         await Promise.all([
             this.loadImoveis(),
+            this.loadProprietarios(),
             this.loadAlugueis()
         ]);
     }
@@ -95,8 +96,8 @@ class AlugueisManager {
     async loadProprietarios() {
         try {
             this.proprietarios = await this.apiClient.get('/api/usuarios/');
-            // Filtrar apenas proprietários
-            this.proprietarios = this.proprietarios.filter(u => u.tipo === 'proprietario');
+            // Incluir proprietários e usuários (que podem ser proprietários)
+            this.proprietarios = this.proprietarios.filter(u => u.tipo === 'proprietario' || u.tipo === 'usuario');
         } catch (error) {
             console.error('Erro ao carregar proprietários:', error);
             this.proprietarios = [];
@@ -139,11 +140,12 @@ class AlugueisManager {
 
             const data = alugueis.map(aluguel => {
                 const imovel = this.imoveis.find(i => i.id === aluguel.id_imovel);
+                const proprietario = this.proprietarios.find(p => p.id === aluguel.id_proprietario);
 
                 return [
                     aluguel.id,
                     imovel ? `${imovel.endereco}` : 'N/A',
-                    `Proprietário ${aluguel.id_proprietario}`, // Temporário até resolver endpoint usuários
+                    proprietario ? proprietario.nome : `Proprietário ${aluguel.id_proprietario}`,
                     aluguel.data_referencia,
                     aluguel.valor_total,
                     aluguel.valor_proprietario,
