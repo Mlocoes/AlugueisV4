@@ -1,15 +1,36 @@
-version: '3.8'
-
 services:
+  db:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: alugueis
+      POSTGRES_USER: alugueis_user
+      POSTGRES_PASSWORD: alugueis_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U alugueis_user -d alugueis"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
   app:
     build: .
     user: "1000:1000"
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=sqlite:///./alugueis.db
+      - DATABASE_URL=postgresql://alugueis_user:alugueis_password@db:5432/alugueis
       - SECRET_KEY=your-secret-key-here
     volumes:
       - .:/app
     restart: unless-stopped
-    command: sh -c "python -c 'from app.core.database import engine, Base; Base.metadata.create_all(bind=engine); print(\"Tabelas criadas!\")' && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+    depends_on:
+      db:
+        condition: service_healthy
+    command: sh -c "sleep 10 && python -c 'from app.core.database import engine, Base; Base.metadata.create_all(bind=engine); print(\"Tabelas criadas!\")' && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
+
+volumes:
+  postgres_data:

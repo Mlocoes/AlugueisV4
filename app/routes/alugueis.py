@@ -192,3 +192,18 @@ def read_aluguel_mensal(
         raise HTTPException(status_code=404, detail="Aluguel mensal not found")
     
     return db_aluguel
+
+@router.delete("/mensais/{aluguel_mensal_id}")
+def delete_aluguel_mensal(
+    aluguel_mensal_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    db_aluguel = db.query(AluguelMensalModel).filter(AluguelMensalModel.id == aluguel_mensal_id).first()
+    if db_aluguel is None:
+        raise HTTPException(status_code=404, detail="Aluguel mensal not found")
+    
+    db.delete(db_aluguel)
+    db.commit()
+    
+    return {"message": "Aluguel mensal deleted successfully"}

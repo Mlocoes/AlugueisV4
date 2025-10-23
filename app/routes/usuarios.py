@@ -9,12 +9,12 @@ from app.core.auth import get_password_hash
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Usuario])
+@router.get("/")
 def read_usuarios(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: UsuarioModel = Depends(get_current_active_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     usuarios = db.query(UsuarioModel).offset(skip).limit(limit).all()
     
@@ -23,22 +23,22 @@ def read_usuarios(
     for usuario in usuarios:
         usuario_dict = {
             'id': usuario.id,
-            'username': usuario.username,
-            'nome': usuario.nome,
-            'sobrenome': usuario.sobrenome,
-            'tipo': usuario.tipo,
-            'email': usuario.email,
-            'telefone': usuario.telefone,
-            'documento': usuario.documento,
-            'tipo_documento': usuario.tipo_documento,
-            'endereco': usuario.endereco,
+            'username': usuario.username or '',
+            'nome': usuario.nome or '',
+            'sobrenome': usuario.sobrenome or '',
+            'tipo': usuario.tipo or 'usuario',
+            'email': usuario.email or '',
+            'telefone': usuario.telefone or '',
+            'documento': usuario.documento or '',
+            'tipo_documento': usuario.tipo_documento or 'CPF',
+            'endereco': usuario.endereco or '',
             'ativo': bool(usuario.ativo) if usuario.ativo is not None else True
         }
         result.append(usuario_dict)
     
     return result
 
-@router.post("/", response_model=Usuario)
+@router.post("/")
 def create_usuario(
     usuario: UsuarioCreate,
     db: Session = Depends(get_db),
@@ -75,20 +75,48 @@ def create_usuario(
     db.add(db_usuario)
     db.commit()
     db.refresh(db_usuario)
-    return db_usuario
+    
+    # Conversão manual para evitar problemas de tipos
+    return {
+        'id': db_usuario.id,
+        'username': db_usuario.username,
+        'nome': db_usuario.nome,
+        'sobrenome': db_usuario.sobrenome,
+        'tipo': db_usuario.tipo,
+        'email': db_usuario.email,
+        'telefone': db_usuario.telefone,
+        'documento': db_usuario.documento,
+        'tipo_documento': db_usuario.tipo_documento,
+        'endereco': db_usuario.endereco,
+        'ativo': bool(db_usuario.ativo) if db_usuario.ativo is not None else True
+    }
 
-@router.get("/{usuario_id}", response_model=Usuario)
+@router.get("/{usuario_id}")
 def read_usuario(
     usuario_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioModel = Depends(get_current_active_user)
+    current_user: Usuario = Depends(get_current_active_user)
 ):
     db_usuario = db.query(UsuarioModel).filter(UsuarioModel.id == usuario_id).first()
     if db_usuario is None:
         raise HTTPException(status_code=404, detail="User not found")
-    return db_usuario
+    
+    # Conversão manual para evitar problemas de tipos
+    return {
+        'id': db_usuario.id,
+        'username': db_usuario.username,
+        'nome': db_usuario.nome,
+        'sobrenome': db_usuario.sobrenome,
+        'tipo': db_usuario.tipo,
+        'email': db_usuario.email,
+        'telefone': db_usuario.telefone,
+        'documento': db_usuario.documento,
+        'tipo_documento': db_usuario.tipo_documento,
+        'endereco': db_usuario.endereco,
+        'ativo': bool(db_usuario.ativo) if db_usuario.ativo is not None else True
+    }
 
-@router.put("/{usuario_id}", response_model=Usuario)
+@router.put("/{usuario_id}")
 def update_usuario(
     usuario_id: int,
     usuario_update: UsuarioUpdate,
@@ -105,7 +133,21 @@ def update_usuario(
     
     db.commit()
     db.refresh(db_usuario)
-    return db_usuario
+    
+    # Conversão manual para evitar problemas de tipos
+    return {
+        'id': db_usuario.id,
+        'username': db_usuario.username,
+        'nome': db_usuario.nome,
+        'sobrenome': db_usuario.sobrenome,
+        'tipo': db_usuario.tipo,
+        'email': db_usuario.email,
+        'telefone': db_usuario.telefone,
+        'documento': db_usuario.documento,
+        'tipo_documento': db_usuario.tipo_documento,
+        'endereco': db_usuario.endereco,
+        'ativo': bool(db_usuario.ativo) if db_usuario.ativo is not None else True
+    }
 
 @router.delete("/{usuario_id}")
 def delete_usuario(

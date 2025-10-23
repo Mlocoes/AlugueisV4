@@ -298,7 +298,7 @@ class AlugueisManager {
                 }
 
                 // Salvar no backend
-                await this.apiClient.put(`/api/alugueis/${aluguelId}`, updatedData);
+                await this.apiClient.put(`/api/alugueis/mensais/${aluguelId}`, updatedData);
 
                 // Feedback visual: célula verde (sucesso)
                 if (cell) {
@@ -471,9 +471,12 @@ class AlugueisManager {
 
         try {
             if (this.currentAluguel) {
-                await this.apiClient.put(`/api/alugueis/${this.currentAluguel.id}`, aluguelData);
+                // Para aluguéis mensais, edição pode não ser apropriada
+                alert('Edição de aluguéis mensais não é suportada. Use exclusão se necessário.');
+                return;
             } else {
-                await this.apiClient.post('/api/alugueis/', aluguelData);
+                alert('Criação de aluguéis mensais deve ser feita via importação Excel.');
+                return;
             }
 
             this.hideModal();
@@ -488,7 +491,7 @@ class AlugueisManager {
 
     async editAluguel(id) {
         try {
-            const aluguel = await this.apiClient.get(`/api/alugueis/${id}`);
+            const aluguel = await this.apiClient.get(`/api/alugueis/mensais/${id}`);
             this.showModal(aluguel);
         } catch (error) {
             console.error('Erro ao carregar aluguel:', error);
@@ -501,7 +504,7 @@ class AlugueisManager {
         }
 
         try {
-            await this.apiClient.delete(`/api/alugueis/${id}`);
+            await this.apiClient.delete(`/api/alugueis/mensais/${id}`);
             await this.loadAlugueis();
             alert('Aluguel excluído com sucesso!');
         } catch (error) {

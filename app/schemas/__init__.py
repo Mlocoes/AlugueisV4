@@ -12,8 +12,12 @@ class UsuarioBase(BaseModel):
     telefone: Optional[str] = Field(None, max_length=20)
     ativo: bool = True
 
-class UsuarioCreate(UsuarioBase):
-    pass
+class UsuarioCreate(BaseModel):
+    nome: str = Field(..., max_length=120)
+    tipo: str = Field(..., pattern="^(administrador|usuario)$")
+    email: str = Field(..., max_length=150)
+    telefone: Optional[str] = Field(None, max_length=20)
+    ativo: bool = True
 
 class UsuarioUpdate(BaseModel):
     nome: Optional[str] = Field(None, max_length=120)
