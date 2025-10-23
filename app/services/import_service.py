@@ -50,7 +50,7 @@ class ImportacaoAvancadaService:
 
     @staticmethod
     def parse_valor_monetario(valor_str: str) -> Optional[Decimal]:
-        """Converte string monetária brasileira para Decimal"""
+        """Converte string monetária brasileira ou americana para Decimal"""
         if not valor_str or str(valor_str).strip() in ['', '-', '']:
             return None
 
@@ -66,8 +66,19 @@ class ImportacaoAvancadaService:
         # Remove "R$", espaços e outros caracteres não numéricos exceto vírgula e ponto
         valor_str = re.sub(r'[R$\s]', '', valor_str)
 
-        # Converte vírgula para ponto (formato brasileiro)
-        valor_str = valor_str.replace('.', '').replace(',', '.')
+        # Detectar formato: se tem vírgula E ponto, assumir brasileiro
+        # Se tem apenas ponto, assumir americano
+        # Se tem apenas vírgula, assumir brasileiro
+        if ',' in valor_str and '.' in valor_str:
+            # Formato brasileiro: 1.234,56
+            valor_str = valor_str.replace('.', '').replace(',', '.')
+        elif ',' in valor_str and '.' not in valor_str:
+            # Apenas vírgula: 1234,56 -> brasileiro
+            valor_str = valor_str.replace(',', '.')
+        elif '.' in valor_str and ',' not in valor_str:
+            # Apenas ponto: 1234.56 -> americano, manter como está
+            pass
+        # Se não tem nenhum, é inteiro
 
         try:
             valor = Decimal(valor_str)
@@ -598,25 +609,13 @@ class ImportacaoAvancadaService:
                                 continue
                             
                             # Valor total do aluguel
-                            valor_total_str = str(row.iloc[valor_total_col]).replace('R$', '').replace('.', '').replace(',', '.').strip()
-                            try:
-                                valor_total = Decimal(valor_total_str.replace('-', '').strip())
-                                if '-' in str(row.iloc[valor_total_col]):
-                                    valor_total = -valor_total
-                            except:
+                            valor_total = self.parse_valor_monetario(str(row.iloc[valor_total_col]))
+                            if valor_total is None:
                                 erros.append(f"Linha {idx+2} planilha '{sheet_name}': Valor total inválido")
                                 continue
                             
                             # Taxa de administração (opcional)
-                            taxa_admin = Decimal('0')
-                            if taxa_admin_col is not None:
-                                taxa_str = str(row.iloc[taxa_admin_col]).replace('R$', '').replace('.', '').replace(',', '.').strip()
-                                try:
-                                    taxa_admin = Decimal(taxa_str.replace('-', '').strip())
-                                    if '-' in str(row.iloc[taxa_admin_col]):
-                                        taxa_admin = -taxa_admin
-                                except:
-                                    pass  # Usar valor padrão
+                            taxa_admin = self.parse_valor_monetario(str(row.iloc[taxa_admin_col])) or Decimal('0')
                             
                             # Processar valores por proprietário
                             for col_idx, prop_nome in proprietario_cols:
@@ -625,12 +624,8 @@ class ImportacaoAvancadaService:
                                     continue
                                 
                                 # Limpar valor
-                                valor_prop_str = valor_prop_str.replace('R$', '').replace('.', '').replace(',', '.').strip()
-                                try:
-                                    valor_proprietario = Decimal(valor_prop_str.replace('-', '').strip())
-                                    if '-' in valor_prop_str:
-                                        valor_proprietario = -valor_proprietario
-                                except:
+                                valor_proprietario = self.parse_valor_monetario(valor_prop_str)
+                                if valor_proprietario is None:
                                     continue
                                 
                                 # Buscar proprietário
