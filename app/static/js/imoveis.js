@@ -91,6 +91,7 @@ class ImoveisManager {
 
             const data = imoveis.map(imovel => [
                 imovel.id,
+                imovel.nome,
                 imovel.tipo,
                 imovel.endereco,
                 imovel.cidade,
@@ -104,9 +105,10 @@ class ImoveisManager {
 
             this.imoveisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Tipo', 'Endereço', 'Cidade', 'Estado', 'Status', 'Valor Aluguel (R$)', 'Ações'],
+                colHeaders: ['ID', 'Nome', 'Tipo', 'Endereço', 'Cidade', 'Estado', 'Status', 'Valor Aluguel (R$)', 'Ações'],
                 columns: [
                     { type: 'text', readOnly: true }, // ID
+                    { type: 'text', readOnly: !isAdmin }, // Nome
                     { 
                         type: 'dropdown',
                         source: ['casa', 'apartamento', 'comercial', 'terreno'],
@@ -344,6 +346,7 @@ class ImoveisManager {
 
         const data = imoveis.map(imovel => [
             imovel.id,
+            imovel.nome,
             imovel.tipo,
             imovel.endereco,
             imovel.cidade,
@@ -365,6 +368,7 @@ class ImoveisManager {
         if (imovel) {
             title.textContent = 'Editar Imóvel';
             form['id'].value = imovel.id;
+            form['nome'].value = imovel.nome;
             form['tipo'].value = imovel.tipo;
             form['status'].value = imovel.status;
             form['endereco'].value = imovel.endereco;
@@ -399,7 +403,7 @@ class ImoveisManager {
         const formData = new FormData(form);
 
         const imovelData = {
-            nome: `${formData.get('tipo')} - ${formData.get('endereco')}`.substring(0, 120),
+            nome: formData.get('nome'),
             endereco: formData.get('endereco'),
             alugado: formData.get('status') === 'alugado',
             ativo: true
