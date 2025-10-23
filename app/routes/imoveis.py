@@ -17,7 +17,27 @@ def read_imoveis(
     current_user: Usuario = Depends(get_current_active_user)
 ):
     imoveis = db.query(ImovelModel).offset(skip).limit(limit).all()
-    return imoveis
+    
+    # Converter manualmente para evitar problemas de conversão automática do Pydantic
+    result = []
+    for imovel in imoveis:
+        imovel_dict = {
+            'id': imovel.id,
+            'nome': imovel.nome,
+            'endereco': imovel.endereco,
+            'tipo': imovel.tipo,
+            'area_total': imovel.area_total,
+            'area_construida': imovel.area_construida,
+            'valor_catastral': imovel.valor_catastral,
+            'valor_mercado': imovel.valor_mercado,
+            'iptu_anual': imovel.iptu_anual,
+            'condominio': imovel.condominio,
+            'alugado': bool(imovel.alugado) if imovel.alugado is not None else False,
+            'ativo': bool(imovel.ativo) if imovel.ativo is not None else True
+        }
+        result.append(imovel_dict)
+    
+    return result
 
 @router.post("/", response_model=Imovel)
 def create_imovel(
