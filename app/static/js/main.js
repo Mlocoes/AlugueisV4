@@ -31,7 +31,7 @@ class ApiClient {
         };
 
         // Não definir Content-Type se for FormData (deixa o fetch definir automaticamente)
-        if (!(options.body instanceof FormData)) {
+        if (!(options.body instanceof FormData) && (!options.headers || !options.headers['Content-Type'])) {
             config.headers['Content-Type'] = 'application/json';
         }
 
@@ -93,13 +93,19 @@ class ApiClient {
     }
 
     async login(username, password) {
-        const formData = new FormData();
-        formData.append('username', username);
-        formData.append('password', password);
-        
+        const details = {
+            'username': username,
+            'password': password
+        };
+        const formBody = Object.keys(details).map(key => 
+            encodeURIComponent(key) + '=' + encodeURIComponent(details[key])).join('&');
+
         const response = await this.request('/auth/login', {
             method: 'POST',
-            body: formData
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+            },
+            body: formBody
         });
         
         return response;

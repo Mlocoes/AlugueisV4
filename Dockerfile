@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
-# Criar usuário não-root
-RUN groupadd -r appuser && useradd -r -g appuser appuser
+# Criar usuário não-root com mesmo UID do host
+RUN groupadd -r appuser -g 1000 && useradd -r -g appuser -u 1000 appuser
 
 WORKDIR /app
 

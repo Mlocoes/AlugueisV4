@@ -140,7 +140,7 @@ class ImportacaoAvancadaService:
 
                     # Criar proprietário
                     proprietario = Usuario(
-                        nome=f"{nome} {sobrenome}".strip(),
+                        nome=nome,
                         sobrenome=sobrenome,
                         documento=documento,
                         tipo_documento=tipo_documento,

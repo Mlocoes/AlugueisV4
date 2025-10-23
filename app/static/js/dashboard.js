@@ -26,8 +26,8 @@ class DashboardManager {
         try {
             // Tentar login com credenciais de teste
             const formData = new FormData();
-            formData.append('username', 'admin');
-            formData.append('password', '123');
+            formData.append('username', 'admin@example.com');
+            formData.append('password', 'admin00');
 
             const response = await fetch('/auth/login', {
                 method: 'POST',
