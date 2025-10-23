@@ -181,13 +181,13 @@ class ImportacaoAvancadaService:
         try:
             df = pd.read_excel(BytesIO(file_content), sheet_name=0)
 
-            # Validar colunas obrigatórias
-            colunas_esperadas = ['Nome', 'Endereço', 'Tipo']
-            colunas_faltando = [col for col in colunas_esperadas if col not in df.columns]
-            if colunas_faltando:
+            # Mapeamento flexível de colunas
+            mapeamento = self.mapear_colunas_imoveis(df.columns.tolist())
+            
+            if not mapeamento['nome'] or not mapeamento['endereco']:
                 return {
                     'success': False,
-                    'message': f'Colunas obrigatórias faltando: {", ".join(colunas_faltando)}'
+                    'message': 'Não foi possível identificar as colunas obrigatórias (Nome/Endereço do imóvel)'
                 }
 
             registros_importados = 0
@@ -195,10 +195,10 @@ class ImportacaoAvancadaService:
 
             for idx, row in df.iterrows():
                 try:
-                    # Limpar e validar dados
-                    nome = str(row['Nome']).strip()
-                    endereco = str(row['Endereço']).strip()
-                    tipo = str(row['Tipo']).strip()
+                    # Limpar e validar dados usando mapeamento
+                    nome = str(row[mapeamento['nome']]).strip()
+                    endereco = str(row[mapeamento['endereco']]).strip()
+                    tipo = str(row.get(mapeamento['tipo'], 'Residencial')).strip() if mapeamento['tipo'] else 'Residencial'
 
                     # Validar tipo
                     tipos_validos = ['Comercial', 'Residencial']
@@ -215,13 +215,13 @@ class ImportacaoAvancadaService:
                         erros.append(f"Linha {idx+2}: Imóvel '{nome}' já existe neste endereço")
                         continue
 
-                    # Parsear valores numéricos
-                    area_total = self.parse_valor_monetario(str(row.get('Área Total', '')))
-                    area_construida = self.parse_valor_monetario(str(row.get('Área Construída', '')))
-                    valor_catastral = self.parse_valor_monetario(str(row.get('Valor Catastral', '')))
-                    valor_mercado = self.parse_valor_monetario(str(row.get('Valor Mercado', '')))
-                    iptu_anual = self.parse_valor_monetario(str(row.get('IPTU Anual', '')))
-                    condominio = self.parse_valor_monetario(str(row.get('Condomínio', '')))
+                    # Parsear valores numéricos usando mapeamento
+                    area_total = self.parse_valor_monetario(str(row.get(mapeamento['area_total'], ''))) if mapeamento['area_total'] else None
+                    area_construida = self.parse_valor_monetario(str(row.get(mapeamento['area_construida'], ''))) if mapeamento['area_construida'] else None
+                    valor_catastral = self.parse_valor_monetario(str(row.get(mapeamento['valor_catastral'], ''))) if mapeamento['valor_catastral'] else None
+                    valor_mercado = self.parse_valor_monetario(str(row.get(mapeamento['valor_mercado'], ''))) if mapeamento['valor_mercado'] else None
+                    iptu_anual = self.parse_valor_monetario(str(row.get(mapeamento['iptu_anual'], ''))) if mapeamento['iptu_anual'] else None
+                    condominio = self.parse_valor_monetario(str(row.get(mapeamento['condominio'], ''))) if mapeamento['condominio'] else None
 
                     # Criar imóvel
                     imovel = Imovel(
@@ -534,3 +534,44 @@ class ImportacaoAvancadaService:
                 'success': False,
                 'message': f'Erro na importação: {str(e)}'
             }
+
+    @staticmethod
+    def mapear_colunas_imoveis(colunas: List[str]) -> Dict[str, str]:
+        """Mapeia colunas do Excel para campos do imóvel de forma flexível"""
+        mapeamento = {
+            'nome': None,
+            'endereco': None,
+            'tipo': None,
+            'area_total': None,
+            'area_construida': None,
+            'valor_catastral': None,
+            'valor_mercado': None,
+            'iptu_anual': None,
+            'condominio': None
+        }
+        
+        # Padronizar nomes das colunas para comparação
+        colunas_padronizadas = [col.lower().strip() for col in colunas]
+        
+        # Mapeamentos possíveis para cada campo
+        mapeamentos_possiveis = {
+            'nome': ['nome', 'nome do imóvel', 'imóvel', 'propriedade', 'titulo'],
+            'endereco': ['endereço', 'endereco', 'localização', 'local', 'rua', 'avenida'],
+            'tipo': ['tipo', 'categoria', 'classificação'],
+            'area_total': ['área total', 'area total', 'area_total'],
+            'area_construida': ['área construída', 'area construida', 'area_construida'],
+            'valor_catastral': ['valor catastral', 'valor_catastral'],
+            'valor_mercado': ['valor mercado', 'valor de mercado', 'valor_mercado'],
+            'iptu_anual': ['iptu anual', 'iptu', 'iptu_anual'],
+            'condominio': ['condomínio', 'condominio', 'condominio']
+        }
+        
+        # Tentar encontrar correspondências
+        for campo, possibilidades in mapeamentos_possiveis.items():
+            for possibilidade in possibilidades:
+                if possibilidade in colunas_padronizadas:
+                    idx = colunas_padronizadas.index(possibilidade)
+                    mapeamento[campo] = colunas[idx]
+                    break
+        
+        return mapeamento

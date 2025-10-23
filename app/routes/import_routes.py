@@ -64,9 +64,12 @@ async def import_imoveis(
     Importa imóveis de um arquivo Excel (.xlsx)
     
     **Estrutura esperada:**
-    - Nome, Endereço, Tipo, Área Total, Área Construída, Valor Catastral, Valor Mercado, IPTU Anual, Condomínio
+    - Colunas obrigatórias: Nome (ou variações como "Nome do Imóvel") e Endereço (ou "Endereço do Imóvel")
+    - Coluna opcional: Tipo (padrão: Residencial)
+    - Outras colunas opcionais: Área Total, Área Construída, Valor Catastral, Valor Mercado, IPTU Anual, Condomínio
+    - O sistema tenta identificar automaticamente as colunas por nome
     - Valores monetários em formato brasileiro (vírgula como decimal)
-    - Tipo deve ser "Comercial" ou "Residencial"
+    - Tipo deve ser "Comercial" ou "Residencial" (padrão: Residencial)
     """
     if not file.filename.endswith(('.xlsx', '.xls')):
         raise HTTPException(
