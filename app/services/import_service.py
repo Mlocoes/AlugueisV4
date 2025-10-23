@@ -306,7 +306,12 @@ class ImportacaoAvancadaService:
                     ).first()
 
                     if not imovel:
-                        erros.append(f"Linha {idx+2}: Imóvel '{nome_imovel}' não encontrado")
+                        # Listar imóveis similares para debug
+                        imoveis_similares = db.query(Imovel).filter(
+                            Imovel.nome.ilike(f"%{nome_imovel.split()[0]}%")
+                        ).limit(3).all()
+                        similares = [i.nome for i in imoveis_similares]
+                        erros.append(f"Linha {idx+2}: Imóvel '{nome_imovel}' não encontrado. Imóveis similares: {similares}")
                         continue
 
                     # Processar participações dos proprietários (colunas dinâmicas)
@@ -340,7 +345,12 @@ class ImportacaoAvancadaService:
                         ).first()
 
                         if not proprietario:
-                            erros.append(f"Linha {idx+2}: Proprietário '{proprietario_nome}' não encontrado")
+                            # Listar proprietários similares para debug
+                            proprietarios_similares = db.query(Usuario).filter(
+                                Usuario.nome.ilike(f"%{proprietario_nome.split()[0]}%")
+                            ).limit(3).all()
+                            similares = [p.nome for p in proprietarios_similares]
+                            erros.append(f"Linha {idx+2}: Proprietário '{proprietario_nome}' não encontrado. Proprietários similares: {similares}")
                             continue
 
                         participacoes_imovel.append({
@@ -358,8 +368,8 @@ class ImportacaoAvancadaService:
                     for part in participacoes_imovel:
                         # Verificar se já existe
                         existente = db.query(Participacao).filter(
-                            Participacao.imovel_id == imovel.id,
-                            Participacao.usuario_id == part['proprietario'].id
+                            Participacao.id_imovel == imovel.id,
+                            Participacao.id_proprietario == part['proprietario'].id
                         ).first()
                         
                         if existente:
@@ -369,8 +379,8 @@ class ImportacaoAvancadaService:
                         else:
                             # Criar nova
                             nova_participacao = Participacao(
-                                imovel_id=imovel.id,
-                                usuario_id=part['proprietario'].id,
+                                id_imovel=imovel.id,
+                                id_proprietario=part['proprietario'].id,
                                 participacao=part['participacao']
                             )
                             db.add(nova_participacao)
