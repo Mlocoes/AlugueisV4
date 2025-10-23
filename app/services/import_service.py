@@ -381,7 +381,8 @@ class ImportacaoAvancadaService:
                             nova_participacao = Participacao(
                                 id_imovel=imovel.id,
                                 id_proprietario=part['proprietario'].id,
-                                participacao=part['participacao']
+                                participacao=part['participacao'],
+                                data_cadastro=date.today()
                             )
                             db.add(nova_participacao)
                         
