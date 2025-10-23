@@ -108,6 +108,33 @@ class Aluguel(AluguelBase):
     class Config:
         from_attributes = True
 
+# Schemas de AluguelMensal
+class AluguelMensalBase(BaseModel):
+    id_imovel: int
+    id_proprietario: int
+    data_referencia: date
+    valor_total: Decimal = Field(..., ge=0, le=999999999.99)
+    valor_proprietario: Decimal = Field(..., ge=0, le=999999999.99)
+    taxa_administracao: Decimal = Field(default=0, ge=0, le=999999999.99)
+    status: Optional[str] = Field(None, max_length=20)
+
+class AluguelMensalCreate(AluguelMensalBase):
+    pass
+
+class AluguelMensalUpdate(BaseModel):
+    valor_total: Optional[Decimal] = Field(None, ge=0, le=999999999.99)
+    valor_proprietario: Optional[Decimal] = Field(None, ge=0, le=999999999.99)
+    taxa_administracao: Optional[Decimal] = Field(None, ge=0, le=999999999.99)
+    status: Optional[str] = Field(None, max_length=20)
+
+class AluguelMensal(AluguelMensalBase):
+    id: int
+    criado_em: Optional[date] = None
+    atualizado_em: Optional[date] = None
+
+    class Config:
+        from_attributes = True
+
 # Schemas de Alias
 class AliasBase(BaseModel):
     nome: str = Field(..., max_length=120)

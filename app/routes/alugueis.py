@@ -3,8 +3,8 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
 from app.core.auth import get_current_active_user
-from app.schemas import Aluguel, AluguelCreate, AluguelUpdate
-from app.models.aluguel import Aluguel as AluguelModel
+from app.schemas import Aluguel, AluguelCreate, AluguelUpdate, AluguelMensal, AluguelMensalCreate, AluguelMensalUpdate
+from app.models.aluguel import Aluguel as AluguelModel, AluguelMensal as AluguelMensalModel
 from app.models.usuario import Usuario
 from app.services.aluguel_service import AluguelService
 
@@ -146,3 +146,49 @@ def obter_relatorio_por_imovel(
     resultado = AluguelService.obter_relatorio_por_imovel(db, ano, mes)
     return {"ano": ano, "mes": mes, "dados": resultado}
     return {"message": "Aluguel deleted successfully"}
+
+# Endpoints para Aluguéis Mensais (dados importados)
+
+@router.get("/mensais/")
+def read_alugueis_mensais(
+    skip: int = 0,
+    limit: int = 1000,
+    imovel_id: Optional[int] = None,
+    proprietario_id: Optional[int] = None,
+    ano: Optional[int] = None,
+    mes: Optional[int] = None,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    query = db.query(AluguelMensalModel)
+    
+    if imovel_id:
+        query = query.filter(AluguelMensalModel.id_imovel == imovel_id)
+    if proprietario_id:
+        query = query.filter(AluguelMensalModel.id_proprietario == proprietario_id)
+    if ano and mes:
+        from datetime import date
+        data_inicio = date(ano, mes, 1)
+        if mes == 12:
+            data_fim = date(ano + 1, 1, 1)
+        else:
+            data_fim = date(ano, mes + 1, 1)
+        query = query.filter(AluguelMensalModel.data_referencia >= data_inicio, 
+                           AluguelMensalModel.data_referencia < data_fim)
+    
+    alugueis_mensais = query.offset(skip).limit(limit).all()
+    
+    # Retornar diretamente sem conversão manual para testar
+    return alugueis_mensais
+
+@router.get("/mensais/{aluguel_mensal_id}", response_model=AluguelMensal)
+def read_aluguel_mensal(
+    aluguel_mensal_id: int,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    db_aluguel = db.query(AluguelMensalModel).filter(AluguelMensalModel.id == aluguel_mensal_id).first()
+    if db_aluguel is None:
+        raise HTTPException(status_code=404, detail="Aluguel mensal not found")
+    
+    return db_aluguel

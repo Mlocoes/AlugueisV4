@@ -17,7 +17,26 @@ def read_usuarios(
     current_user: UsuarioModel = Depends(get_current_active_user)
 ):
     usuarios = db.query(UsuarioModel).offset(skip).limit(limit).all()
-    return usuarios
+    
+    # Conversão manual para evitar problemas de tipos
+    result = []
+    for usuario in usuarios:
+        usuario_dict = {
+            'id': usuario.id,
+            'username': usuario.username,
+            'nome': usuario.nome,
+            'sobrenome': usuario.sobrenome,
+            'tipo': usuario.tipo,
+            'email': usuario.email,
+            'telefone': usuario.telefone,
+            'documento': usuario.documento,
+            'tipo_documento': usuario.tipo_documento,
+            'endereco': usuario.endereco,
+            'ativo': bool(usuario.ativo) if usuario.ativo is not None else True
+        }
+        result.append(usuario_dict)
+    
+    return result
 
 @router.post("/", response_model=Usuario)
 def create_usuario(

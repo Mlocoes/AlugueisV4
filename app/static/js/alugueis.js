@@ -5,6 +5,7 @@ class AlugueisManager {
         this.alugueisTable = null;
         this.currentAluguel = null;
         this.imoveis = [];
+        this.proprietarios = [];
         this.init();
     }
 
@@ -91,6 +92,17 @@ class AlugueisManager {
         }
     }
 
+    async loadProprietarios() {
+        try {
+            this.proprietarios = await this.apiClient.get('/api/usuarios/');
+            // Filtrar apenas proprietários
+            this.proprietarios = this.proprietarios.filter(u => u.tipo === 'proprietario');
+        } catch (error) {
+            console.error('Erro ao carregar proprietários:', error);
+            this.proprietarios = [];
+        }
+    }
+
     populateImovelSelect() {
         const select = document.getElementById('imovel_id');
         select.innerHTML = '<option value="">Selecione um imóvel...</option>';
@@ -114,7 +126,7 @@ class AlugueisManager {
 
     async loadAlugueis() {
         try {
-            const alugueis = await this.apiClient.get('/api/alugueis/');
+            const alugueis = await this.apiClient.get('/api/alugueis/mensais/');
             
             // Armazenar dados originais
             this.alugueisData = alugueis;
@@ -126,17 +138,17 @@ class AlugueisManager {
             }
 
             const data = alugueis.map(aluguel => {
-                const imovel = this.imoveis.find(i => i.id === aluguel.imovel_id);
+                const imovel = this.imoveis.find(i => i.id === aluguel.id_imovel);
 
                 return [
                     aluguel.id,
-                    imovel ? `${imovel.endereco} - ${imovel.cidade}` : 'N/A',
-                    aluguel.inquilino_nome,
-                    aluguel.valor_aluguel,
-                    aluguel.dia_vencimento,
-                    aluguel.data_inicio,
-                    aluguel.data_fim || '',
-                    aluguel.status,
+                    imovel ? `${imovel.endereco}` : 'N/A',
+                    `Proprietário ${aluguel.id_proprietario}`, // Temporário até resolver endpoint usuários
+                    aluguel.data_referencia,
+                    aluguel.valor_total,
+                    aluguel.valor_proprietario,
+                    aluguel.taxa_administracao,
+                    aluguel.status || 'pendente',
                     'Ações'
                 ];
             });
@@ -145,25 +157,32 @@ class AlugueisManager {
 
             this.alugueisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Imóvel', 'Inquilino', 'Valor (R$)', 'Dia Venc.', 'Data Início', 'Data Fim', 'Status', 'Ações'],
+                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Data Ref.', 'Valor Total', 'Valor Prop.', 'Taxa Admin', 'Status', 'Ações'],
                 columns: [
                     { type: 'text', readOnly: true }, // ID
                     { type: 'text', readOnly: true }, // Imóvel (não editável)
-                    { type: 'text', readOnly: !isAdmin }, // Inquilino
+                    { type: 'text', readOnly: !isAdmin }, // Proprietário
+                    {
+                        type: 'date',
+                        dateFormat: 'YYYY-MM-DD',
+                        readOnly: !isAdmin
+                    }, // Data Referência
                     {
                         type: 'numeric',
                         numericFormat: { pattern: '0,0.00' },
                         readOnly: !isAdmin
-                    }, // Valor
+                    }, // Valor Total
                     {
                         type: 'numeric',
                         readOnly: !isAdmin
-                    }, // Dia Vencimento
-                    { type: 'date', dateFormat: 'YYYY-MM-DD', readOnly: !isAdmin }, // Data Início
-                    { type: 'date', dateFormat: 'YYYY-MM-DD', readOnly: !isAdmin }, // Data Fim
+                    }, // Valor Proprietário
+                    {
+                        type: 'numeric',
+                        readOnly: !isAdmin
+                    }, // Taxa Administração
                     {
                         type: 'dropdown',
-                        source: ['ativo', 'finalizado', 'cancelado'],
+                        source: ['ativo', 'finalizado', 'cancelado', 'pendente'],
                         readOnly: !isAdmin,
                         renderer: function(instance, td, row, col, prop, value) {
                             Handsontable.renderers.DropdownRenderer.apply(this, arguments);
@@ -179,6 +198,10 @@ class AlugueisManager {
                                 td.style.backgroundColor = '#fef2f2';
                                 td.style.color = '#dc2626';
                                 td.textContent = 'Cancelado';
+                            } else if (value === 'pendente') {
+                                td.style.backgroundColor = '#fff3cd';
+                                td.style.color = '#856404';
+                                td.textContent = 'Pendente';
                             }
                         }
                     }, // Status
