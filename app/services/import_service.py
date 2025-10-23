@@ -501,15 +501,27 @@ class ImportacaoAvancadaService:
                     # Extrair data de referência da célula A1
                     data_ref_str = str(df.iloc[0, 0]).strip()
                     try:
-                        # Converter formato brasileiro DD/MM/YYYY para date
-                        data_referencia = datetime.strptime(data_ref_str, '%d/%m/%Y').date()
-                    except ValueError:
-                        erros.append(f"Planilha '{sheet_name}': Data inválida '{data_ref_str}'")
+                        # Tentar diferentes formatos de data
+                        if 'T' in data_ref_str:
+                            # Formato ISO com timezone
+                            data_referencia = datetime.fromisoformat(data_ref_str.replace('Z', '+00:00')).date()
+                        elif len(data_ref_str.split('-')[0]) == 4:
+                            # Formato YYYY-MM-DD
+                            if ' ' in data_ref_str:
+                                # Com hora: YYYY-MM-DD HH:MM:SS
+                                data_referencia = datetime.strptime(data_ref_str.split(' ')[0], '%Y-%m-%d').date()
+                            else:
+                                # Apenas data: YYYY-MM-DD
+                                data_referencia = datetime.strptime(data_ref_str, '%Y-%m-%d').date()
+                        else:
+                            # Formato brasileiro DD/MM/YYYY
+                            data_referencia = datetime.strptime(data_ref_str, '%d/%m/%Y').date()
+                    except ValueError as e:
+                        erros.append(f"Planilha '{sheet_name}': Data inválida '{data_ref_str}' - {str(e)}")
                         continue
                     
-                    # Usar a linha 1 como cabeçalhos
-                    df.columns = df.iloc[1]
-                    df = df[2:]  # Pular as duas primeiras linhas (data e cabeçalhos)
+                    # Pular a primeira linha (data) e usar as linhas seguintes como dados
+                    df = df[1:]  # Remover linha da data
                     
                     # Remover linhas vazias
                     df = df.dropna(how='all')
@@ -517,38 +529,62 @@ class ImportacaoAvancadaService:
                     if df.empty:
                         continue
                     
-                    # Identificar colunas
-                    colunas = list(df.columns)
+                    # Neste formato específico, não há cabeçalhos
+                    # A primeira linha já contém dados (imóvel, valor total, valores por proprietário, taxa)
+                    df_data = df[1:]  # Pular apenas a linha da data
                     
-                    # Encontrar índices das colunas importantes
-                    imovel_col = None
-                    valor_total_col = None
-                    taxa_admin_col = None
+                    # Remover linhas vazias
+                    df_data = df_data.dropna(how='all')
                     
-                    for i, col in enumerate(colunas):
-                        col_str = str(col).lower().strip()
-                        if 'imóvel' in col_str or 'endereço' in col_str or 'imovel' in col_str:
-                            imovel_col = i
-                        elif 'valor total' in col_str:
-                            valor_total_col = i
-                        elif 'taxa' in col_str and 'admin' in col_str:
-                            taxa_admin_col = i
-                    
-                    if imovel_col is None or valor_total_col is None:
-                        erros.append(f"Planilha '{sheet_name}': Colunas obrigatórias não encontradas")
+                    if df_data.empty:
                         continue
                     
-                    # Identificar colunas de proprietários (todas exceto as especiais)
+                    # Verificar se a primeira linha de dados tem a estrutura esperada
+                    first_data_row = df_data.iloc[0] if len(df_data) > 0 else None
+                    if first_data_row is None:
+                        erros.append(f"Planilha '{sheet_name}': Dados insuficientes")
+                        continue
+                    
+                    # A estrutura esperada é:
+                    # Coluna 0: Nome do imóvel
+                    # Coluna 1: Valor Total
+                    # Colunas 2 até penúltima: Valores por proprietário (sem nomes específicos)
+                    # Última coluna: Taxa de Administração
+                    
+                    num_cols = len(df_data.columns)
+                    if num_cols < 3:
+                        erros.append(f"Planilha '{sheet_name}': Formato inválido - poucas colunas")
+                        continue
+                    
+                    # Definir índices das colunas
+                    imovel_col = 0
+                    valor_total_col = 1
+                    taxa_admin_col = num_cols - 1
+                    
+                    # Neste caso, não temos nomes de proprietários específicos
+                    # Vamos assumir uma ordem baseada na posição
                     proprietario_cols = []
-                    for i, col in enumerate(colunas):
-                        if i not in [imovel_col, valor_total_col, taxa_admin_col]:
-                            proprietario_cols.append((i, str(col).strip()))
+                    for i in range(2, num_cols - 1):  # Do 3º até o penúltimo
+                        proprietario_cols.append((i, f'Proprietario_{i-1}'))
+                    
+                    # Buscar proprietários reais do sistema na ordem dos valores
+                    from app.models.usuario import Usuario
+                    proprietarios_reais = db.query(Usuario).filter(
+                        Usuario.tipo.in_(['usuario', 'proprietario'])
+                    ).order_by(Usuario.id).limit(len(proprietario_cols)).all()
+                    
+                    if len(proprietarios_reais) < len(proprietario_cols):
+                        erros.append(f"Planilha '{sheet_name}': Não há proprietários suficientes cadastrados ({len(proprietarios_reais)} encontrados, {len(proprietario_cols)} necessários)")
+                        continue
+                    
+                    # Mapear colunas para proprietários reais
+                    proprietario_cols = [(i, prop.nome) for i, prop in zip(range(2, num_cols - 1), proprietarios_reais)]
                     
                     # Processar cada linha (imóvel)
-                    for idx, row in df.iterrows():
+                    for idx, row in df_data.iterrows():
                         try:
-                            imovel_nome = str(row.iloc[imovel_col]).strip()
-                            if not imovel_nome or imovel_nome.lower() == 'nan':
+                            imovel_nome = str(row.iloc[0]).strip()
+                            if not imovel_nome or imovel_nome.lower() in ['nan', 'none', '']:
                                 continue
                             
                             # Buscar imóvel por nome
@@ -600,8 +636,7 @@ class ImportacaoAvancadaService:
                                 # Buscar proprietário
                                 from app.models.usuario import Usuario
                                 proprietario = db.query(Usuario).filter(
-                                    Usuario.nome.ilike(f'%{prop_nome}%'),
-                                    Usuario.tipo == 'proprietario'
+                                    Usuario.nome.ilike(f'%{prop_nome}%')
                                 ).first()
                                 
                                 if not proprietario:
