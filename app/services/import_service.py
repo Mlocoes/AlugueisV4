@@ -272,14 +272,16 @@ class ImportacaoAvancadaService:
                     'message': 'Arquivo deve ter pelo menos 3 colunas: Nome, Endereço, VALOR'
                 }
 
-            # Verificar se tem coluna VALOR (pode ter espaço no final)
-            coluna_valor = None
-            for col in df.columns:
-                if 'VALOR' in str(col).upper():
-                    coluna_valor = col
-                    break
+            # Mapeamento flexível de colunas
+            mapeamento = self.mapear_colunas_participacoes(df.columns.tolist())
             
-            if not coluna_valor:
+            if not mapeamento['nome_imovel']:
+                return {
+                    'success': False,
+                    'message': 'Não foi possível identificar a coluna do nome do imóvel'
+                }
+            
+            if not mapeamento['valor_total']:
                 return {
                     'success': False,
                     'message': 'Coluna VALOR é obrigatória'
@@ -290,19 +292,17 @@ class ImportacaoAvancadaService:
 
             for idx, row in df.iterrows():
                 try:
-                    nome_imovel = str(row.get('Nome', '')).strip()
-                    endereco_imovel = str(row.get('Endereço', '')).strip()
-                    valor_total = row[coluna_valor]
+                    nome_imovel = str(row[mapeamento['nome_imovel']]).strip()
+                    valor_total = row[mapeamento['valor_total']]
 
                     # Validar VALOR (deve ser próximo de 1.0 com tolerância)
                     if pd.isna(valor_total) or abs(float(valor_total) - 1.0) > 0.01:
                         erros.append(f"Linha {idx+2}: VALOR deve ser próximo de 1.0 (100%) - encontrado: {valor_total}")
                         continue
 
-                    # Buscar imóvel
+                    # Buscar imóvel por nome
                     imovel = db.query(Imovel).filter(
-                        Imovel.nome.ilike(f"%{nome_imovel}%"),
-                        Imovel.endereco.ilike(f"%{endereco_imovel}%")
+                        Imovel.nome.ilike(f"%{nome_imovel}%")
                     ).first()
 
                     if not imovel:
@@ -313,7 +313,11 @@ class ImportacaoAvancadaService:
                     participacoes_imovel = []
                     soma_participacoes = Decimal('0')
 
-                    for col_name in df.columns[3:]:  # Pular Nome, Endereço, VALOR
+                    for col_name in df.columns:
+                        # Pular colunas do imóvel
+                        if col_name == mapeamento['nome_imovel'] or col_name == mapeamento.get('endereco_imovel', '') or col_name == mapeamento['valor_total']:
+                            continue
+                            
                         proprietario_nome = str(col_name).strip()
                         participacao_valor = row[col_name]
 
@@ -350,15 +354,27 @@ class ImportacaoAvancadaService:
                         erros.append(f"Linha {idx+2}: Soma das participações deve ser 100% (atual: {soma_participacoes * 100:.2f}%)")
                         continue
 
-                    # Criar registros de participação
+                    # Salvar participações no banco
                     for part in participacoes_imovel:
-                        participacao = Participacao(
-                            id_imovel=imovel.id,
-                            id_proprietario=part['proprietario'].id,
-                            participacao=part['participacao'],
-                            data_cadastro=date.today()
-                        )
-                        db.add(participacao)
+                        # Verificar se já existe
+                        existente = db.query(Participacao).filter(
+                            Participacao.imovel_id == imovel.id,
+                            Participacao.usuario_id == part['proprietario'].id
+                        ).first()
+                        
+                        if existente:
+                            # Atualizar
+                            existente.participacao = part['participacao']
+                            db.add(existente)
+                        else:
+                            # Criar nova
+                            nova_participacao = Participacao(
+                                imovel_id=imovel.id,
+                                usuario_id=part['proprietario'].id,
+                                participacao=part['participacao']
+                            )
+                            db.add(nova_participacao)
+                        
                         registros_importados += 1
 
                 except Exception as e:
@@ -380,164 +396,10 @@ class ImportacaoAvancadaService:
                 'message': f'Erro na importação: {str(e)}'
             }
 
-    def importar_alugueis(self, file_content: bytes, db: Session) -> Dict[str, Any]:
-        """Importa aluguéis mensais do Excel (múltiplas planilhas)"""
-        try:
-            # Carregar workbook para acessar múltiplas planilhas
-            wb = openpyxl.load_workbook(BytesIO(file_content), data_only=True)
-
-            registros_importados = 0
-            erros = []
-            meses_processados = 0
-
-            # Processar cada planilha (cada uma representa um mês)
-            for sheet_name in wb.sheetnames:
-                try:
-                    ws = wb[sheet_name]
-                    meses_processados += 1
-
-                    # Extrair data de referência da primeira célula (A1)
-                    data_celula = ws['A1'].value
-                    if not data_celula:
-                        erros.append(f"Planilha '{sheet_name}': Data de referência não encontrada na célula A1")
-                        continue
-
-                    data_referencia = self.parse_data(str(data_celula))
-                    if not data_referencia:
-                        erros.append(f"Planilha '{sheet_name}': Data de referência inválida: {data_celula}")
-                        continue
-
-                    # Ler dados da planilha
-                    rows = list(ws.iter_rows(values_only=True))
-                    if len(rows) < 2:
-                        erros.append(f"Planilha '{sheet_name}': Planilha deve ter pelo menos cabeçalho e uma linha de dados")
-                        continue
-
-                    # Cabeçalhos (linha 1, mas pular A1 que é a data)
-                    headers = rows[0][1:]  # Pular primeira coluna (data)
-
-                    # Processar cada linha de dados
-                    for row_idx, row in enumerate(rows[1:], start=2):
-                        try:
-                            if not row or len(row) < 3:
-                                continue  # Linha vazia
-
-                            # Coluna 1: Nome/Endereço do imóvel
-                            imovel_ident = str(row[0]).strip() if row[0] else ""
-                            if not imovel_ident:
-                                continue
-
-                            # Coluna 2: Valor Total
-                            valor_total = self.parse_valor_monetario(str(row[1]) if row[1] else "")
-                            if valor_total is None or valor_total <= 0:
-                                erros.append(f"Planilha '{sheet_name}', linha {row_idx}: Valor total inválido")
-                                continue
-
-                            # Última coluna: Taxa de Administração
-                            taxa_admin = self.parse_valor_monetario(str(row[-1]) if row[-1] else "") or Decimal('0')
-
-                            # Colunas do meio: Valores por proprietário
-                            valores_proprietarios = []
-                            soma_valores_proprietarios = Decimal('0')
-
-                            for i, header in enumerate(headers[:-1]):  # Excluir última coluna (taxa)
-                                if i + 2 >= len(row):  # +2 porque row[0] é imóvel, row[1] é valor total
-                                    break
-
-                                proprietario_nome = str(header).strip()
-                                valor_str = str(row[i + 2]).strip() if row[i + 2] else ""
-
-                                valor_proprietario = self.parse_valor_monetario(valor_str)
-                                if valor_proprietario is None:
-                                    valor_proprietario = Decimal('0')
-
-                                if valor_proprietario > 0:
-                                    valores_proprietarios.append({
-                                        'nome': proprietario_nome,
-                                        'valor': valor_proprietario
-                                    })
-                                    soma_valores_proprietarios += valor_proprietario
-
-                            # Validar soma (valores proprietários + taxa ≈ valor total)
-                            total_calculado = soma_valores_proprietarios + taxa_admin
-                            if abs(total_calculado - valor_total) > Decimal('0.01'):  # Tolerância de 1 centavo
-                                erros.append(f"Planilha '{sheet_name}', linha {row_idx}: Soma dos valores ({total_calculado}) não corresponde ao total ({valor_total})")
-                                continue
-
-                            # Buscar imóvel
-                            imovel = db.query(Imovel).filter(
-                                Imovel.nome.ilike(f"%{imovel_ident}%") |
-                                Imovel.endereco.ilike(f"%{imovel_ident}%")
-                            ).first()
-
-                            if not imovel:
-                                erros.append(f"Planilha '{sheet_name}', linha {row_idx}: Imóvel '{imovel_ident}' não encontrado")
-                                continue
-
-                            # Criar registros de aluguel mensal para cada proprietário
-                            for vp in valores_proprietarios:
-                                # Buscar proprietário
-                                proprietario = db.query(Usuario).filter(
-                                    Usuario.nome.ilike(f"%{vp['nome']}%")
-                                ).first()
-
-                                if not proprietario:
-                                    erros.append(f"Planilha '{sheet_name}', linha {row_idx}: Proprietário '{vp['nome']}' não encontrado")
-                                    continue
-
-                                # Verificar se já existe registro para este mês/proprietário/imóvel
-                                existente = db.query(AluguelMensal).filter(
-                                    AluguelMensal.id_imovel == imovel.id,
-                                    AluguelMensal.id_proprietario == proprietario.id,
-                                    AluguelMensal.data_referencia == data_referencia
-                                ).first()
-
-                                if existente:
-                                    # Atualizar existente
-                                    existente.valor_total = valor_total
-                                    existente.valor_proprietario = vp['valor']
-                                    existente.taxa_administracao = taxa_admin
-                                else:
-                                    # Criar novo
-                                    aluguel_mensal = AluguelMensal(
-                                        id_imovel=imovel.id,
-                                        id_proprietario=proprietario.id,
-                                        data_referencia=data_referencia,
-                                        valor_total=valor_total,
-                                        valor_proprietario=vp['valor'],
-                                        taxa_administracao=taxa_admin,
-                                        status='recebido' if vp['valor'] > 0 else 'pendente'
-                                    )
-                                    db.add(aluguel_mensal)
-
-                                registros_importados += 1
-
-                        except Exception as e:
-                            erros.append(f"Planilha '{sheet_name}', linha {row_idx}: Erro ao processar - {str(e)}")
-
-                except Exception as e:
-                    erros.append(f"Planilha '{sheet_name}': Erro ao processar planilha - {str(e)}")
-
-            db.commit()
-
-            return {
-                'success': True,
-                'message': f'Importação concluída. {registros_importados} registros de aluguel importados de {meses_processados} meses.',
-                'registros_importados': registros_importados,
-                'meses_processados': meses_processados,
-                'erros': erros
-            }
-
-        except Exception as e:
-            db.rollback()
-            return {
-                'success': False,
-                'message': f'Erro na importação: {str(e)}'
-            }
 
     @staticmethod
     def mapear_colunas_imoveis(colunas: List[str]) -> Dict[str, str]:
-        """Mapeia colunas do Excel para campos do imóvel de forma flexível"""
+        """Mapeia colunas do Excel para campos de imóveis de forma flexível"""
         mapeamento = {
             'nome': None,
             'endereco': None,
@@ -555,15 +417,15 @@ class ImportacaoAvancadaService:
         
         # Mapeamentos possíveis para cada campo
         mapeamentos_possiveis = {
-            'nome': ['nome', 'nome do imóvel', 'imóvel', 'propriedade', 'titulo'],
+            'nome': ['nome', 'imóvel', 'imovel', 'propriedade'],
             'endereco': ['endereço', 'endereco', 'localização', 'local', 'rua', 'avenida'],
-            'tipo': ['tipo', 'categoria', 'classificação'],
-            'area_total': ['área total', 'area total', 'area_total'],
-            'area_construida': ['área construída', 'area construida', 'area_construida'],
-            'valor_catastral': ['valor catastral', 'valor_catastral'],
-            'valor_mercado': ['valor mercado', 'valor de mercado', 'valor_mercado'],
-            'iptu_anual': ['iptu anual', 'iptu', 'iptu_anual'],
-            'condominio': ['condomínio', 'condominio', 'condominio']
+            'tipo': ['tipo', 'categoria'],
+            'area_total': ['área total', 'area total', 'total area'],
+            'area_construida': ['área construída', 'area construida', 'constructed area'],
+            'valor_catastral': ['valor catastral', 'cadastral value'],
+            'valor_mercado': ['valor de mercado', 'valor mercado', 'market value'],
+            'iptu_anual': ['iptu', 'iptu anual', 'annual iptu'],
+            'condominio': ['condomínio', 'condominio', 'hoa fee']
         }
         
         # Tentar encontrar correspondências
@@ -575,3 +437,33 @@ class ImportacaoAvancadaService:
                     break
         
         return mapeamento
+
+    @staticmethod
+    def mapear_colunas_participacoes(colunas: List[str]) -> Dict[str, str]:
+        """Mapeia colunas do Excel para campos de participações de forma flexível"""
+        mapeamento = {
+            'nome_imovel': None,
+            'endereco_imovel': None,
+            'valor_total': None
+        }
+        
+        # Padronizar nomes das colunas para comparação
+        colunas_padronizadas = [col.lower().strip() for col in colunas]
+        
+        # Mapeamentos possíveis para cada campo
+        mapeamentos_possiveis = {
+            'nome_imovel': ['nome', 'nome do imóvel', 'imóvel', 'imovel', 'propriedade'],
+            'endereco_imovel': ['endereço', 'endereco', 'localização', 'local', 'rua', 'avenida'],
+            'valor_total': ['valor', 'valor total', 'total']
+        }
+        
+        # Tentar encontrar correspondências
+        for campo, possibilidades in mapeamentos_possiveis.items():
+            for possibilidade in possibilidades:
+                if possibilidade in colunas_padronizadas:
+                    idx = colunas_padronizadas.index(possibilidade)
+                    mapeamento[campo] = colunas[idx]
+                    break
+        
+        return mapeamento
+

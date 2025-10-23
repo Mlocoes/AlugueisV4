@@ -48,9 +48,6 @@ async def import_proprietarios(
     service = ImportacaoAvancadaService()
     result = service.importar_proprietarios(content, db)
     
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
-    
     return result
 
 
@@ -81,9 +78,6 @@ async def import_imoveis(
     service = ImportacaoAvancadaService()
     result = service.importar_imoveis(content, db)
     
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
-    
     return result
 
 
@@ -110,9 +104,6 @@ async def import_participacoes(
     content = await file.read()
     service = ImportacaoAvancadaService()
     result = service.importar_participacoes(content, db)
-    
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
     
     return result
 
@@ -141,9 +132,6 @@ async def import_alugueis(
     content = await file.read()
     service = ImportacaoAvancadaService()
     result = service.importar_alugueis(content, db)
-    
-    if not result['success']:
-        raise HTTPException(status_code=400, detail=result['message'])
     
     return result
 
