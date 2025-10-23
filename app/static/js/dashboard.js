@@ -5,7 +5,9 @@ class DashboardManager {
     constructor() {
         this.apiClient = new ApiClient();
         this.receitaChart = null;
-        this.proprietariosChart = null;
+        this.statusImoveisChart = null;
+        this.tiposImoveisChart = null;
+        this.receitaProprietariosChart = null;
         this.alugueisTable = null;
         this.isCheckingAuth = false; // Flag para evitar múltiplas verificações
         this.init();
@@ -102,20 +104,12 @@ class DashboardManager {
 
     async loadStats() {
         try {
-            // Por enquanto, usar dados mock até implementar o backend
-            const stats = {
-                total_imoveis: 5,
-                receita_mensal: 15000.00,
-                alugueis_ativos: 3,
-                alugueis_vencidos: 0
-            };
-
-            // const stats = await this.apiClient.get('/api/dashboard/stats');
+            const stats = await this.apiClient.get('/api/dashboard/stats');
 
             document.getElementById('total-imoveis').textContent = stats.total_imoveis;
             document.getElementById('receita-mensal').textContent = `R$ ${stats.receita_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
             document.getElementById('alugueis-ativos').textContent = stats.alugueis_ativos;
-            document.getElementById('alugueis-vencidos').textContent = stats.alugueis_vencidos;
+            document.getElementById('alugueis-vencidos').textContent = '0'; // TODO: implementar contagem de aluguéis vencidos
 
         } catch (error) {
             console.error('Erro ao carregar estatísticas:', error);
@@ -129,33 +123,27 @@ class DashboardManager {
 
     async loadCharts() {
         try {
-            // Por enquanto, usar dados mock até implementar o backend
-            const chartData = {
-                receita_por_mes: [
-                    { mes: 'Jan', receita: 12000 },
-                    { mes: 'Fev', receita: 13500 },
-                    { mes: 'Mar', receita: 11800 },
-                    { mes: 'Abr', receita: 14200 },
-                    { mes: 'Mai', receita: 13800 },
-                    { mes: 'Jun', receita: 15600 }
-                ],
-                status_imoveis: [
-                    { status: 'Alugado', quantidade: 3 },
-                    { status: 'Disponível', quantidade: 2 },
-                    { status: 'Manutenção', quantidade: 0 }
-                ]
-            };
+            const chartData = await this.apiClient.get('/api/dashboard/charts');
 
-            // const chartData = await this.apiClient.get('/api/dashboard/charts');
-
+            // Renderizar gráfico de receita
             this.renderReceitaChart(chartData.receita_por_mes);
-            this.renderProprietariosChart(chartData.status_imoveis);
+            
+            // Renderizar gráfico de status dos imóveis
+            this.renderStatusImoveisChart(chartData.status_imoveis);
+            
+            // Renderizar gráfico de distribuição por tipo
+            this.renderTiposImoveisChart(chartData.distribuicao_tipos);
+            
+            // Renderizar gráfico de receita por proprietário
+            this.renderReceitaProprietariosChart(chartData.receita_por_proprietario);
 
         } catch (error) {
             console.error('Erro ao carregar gráficos:', error);
             // Renderizar gráficos vazios em caso de erro
             this.renderReceitaChart([]);
-            this.renderProprietariosChart([]);
+            this.renderStatusImoveisChart([]);
+            this.renderTiposImoveisChart([]);
+            this.renderReceitaProprietariosChart([]);
         }
     }
 
@@ -213,28 +201,78 @@ class DashboardManager {
         });
     }
 
-    renderProprietariosChart(data) {
+    renderStatusImoveisChart(data) {
         // Verificar se Chart.js está disponível
         if (typeof Chart === 'undefined') {
             console.error('Chart.js não está carregado');
             return;
         }
 
-        const ctx = document.getElementById('proprietarios-chart').getContext('2d');
+        const ctx = document.getElementById('status-imoveis-chart').getContext('2d');
 
-        if (this.proprietariosChart) {
-            this.proprietariosChart.destroy();
+        if (this.statusImoveisChart) {
+            this.statusImoveisChart.destroy();
         }
 
         // Processar dados para o formato esperado pelo Chart.js
         const labels = data.map(item => item.status || 'N/A');
         const values = data.map(item => item.quantidade || 0);
 
-        this.proprietariosChart = new Chart(ctx, {
-            type: 'doughnut',
+        this.statusImoveisChart = new Chart(ctx, {
+            type: 'bar',
             data: {
                 labels: labels,
                 datasets: [{
+                    label: 'Quantidade',
+                    data: values,
+                    backgroundColor: 'rgb(16, 185, 129)',
+                    borderColor: 'rgb(5, 150, 105)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Status dos Imóveis'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                }
+            }
+        });
+    }
+
+    renderTiposImoveisChart(data) {
+        // Verificar se Chart.js está disponível
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js não está carregado');
+            return;
+        }
+
+        const ctx = document.getElementById('tipos-imoveis-chart').getContext('2d');
+
+        if (this.tiposImoveisChart) {
+            this.tiposImoveisChart.destroy();
+        }
+
+        // Processar dados para o formato esperado pelo Chart.js
+        const labels = data.map(item => item.tipo || 'N/A');
+        const values = data.map(item => item.quantidade || 0);
+
+        this.tiposImoveisChart = new Chart(ctx, {
+            type: 'pie',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Quantidade',
                     data: values,
                     backgroundColor: [
                         'rgb(59, 130, 246)',
@@ -242,7 +280,9 @@ class DashboardManager {
                         'rgb(245, 158, 11)',
                         'rgb(239, 68, 68)',
                         'rgb(139, 92, 246)'
-                    ]
+                    ],
+                    borderColor: 'rgb(255, 255, 255)',
+                    borderWidth: 2
                 }]
             },
             options: {
@@ -253,7 +293,61 @@ class DashboardManager {
                     },
                     title: {
                         display: true,
-                        text: 'Distribuição por Proprietário'
+                        text: 'Distribuição por Tipo de Imóvel'
+                    }
+                }
+            }
+        });
+    }
+
+    renderReceitaProprietariosChart(data) {
+        // Verificar se Chart.js está disponível
+        if (typeof Chart === 'undefined') {
+            console.error('Chart.js não está carregado');
+            return;
+        }
+
+        const ctx = document.getElementById('receita-proprietarios-chart').getContext('2d');
+
+        if (this.receitaProprietariosChart) {
+            this.receitaProprietariosChart.destroy();
+        }
+
+        // Processar dados para o formato esperado pelo Chart.js
+        const labels = data.map(item => item.proprietario || 'N/A');
+        const values = data.map(item => item.receita_total || 0);
+
+        this.receitaProprietariosChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Receita Total (R$)',
+                    data: values,
+                    backgroundColor: 'rgb(59, 130, 246)',
+                    borderColor: 'rgb(37, 99, 235)',
+                    borderWidth: 2
+                }]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    legend: {
+                        position: 'top',
+                    },
+                    title: {
+                        display: true,
+                        text: 'Receita por Proprietário'
+                    }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        ticks: {
+                            callback: function(value) {
+                                return 'R$ ' + value.toLocaleString('pt-BR');
+                            }
+                        }
                     }
                 }
             }
@@ -262,14 +356,8 @@ class DashboardManager {
 
     async loadRecentRentals() {
         try {
-            // Por enquanto, usar dados mock até implementar o backend
-            const rentals = [
-                { id: 1, endereco: 'Rua A, 123', inquilino: 'João Silva', valor: 1500.00, data: '2024-01-15', status: 'Ativo' },
-                { id: 2, endereco: 'Rua B, 456', inquilino: 'Maria Santos', valor: 1200.00, data: '2024-01-10', status: 'Ativo' },
-                { id: 3, endereco: 'Rua C, 789', inquilino: 'Pedro Oliveira', valor: 1800.00, data: '2024-01-05', status: 'Ativo' }
-            ];
-
-            // const rentals = await this.apiClient.get('/api/alugueis?limit=10&order_by=data_criacao&order=desc');
+            // Buscar aluguéis mensais recentes (últimos 10)
+            const rentals = await this.apiClient.get('/api/alugueis/mensais/?limit=10');
 
             const container = document.getElementById('alugueis-recentes-table');
 
@@ -285,16 +373,16 @@ class DashboardManager {
 
             const data = rentals.map(rental => [
                 rental.id,
-                rental.endereco,
-                rental.inquilino,
-                `R$ ${rental.valor.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                new Date(rental.data).toLocaleDateString('pt-BR'),
-                rental.status
+                `Imóvel ${rental.id_imovel}`,
+                `Proprietário ${rental.id_proprietario}`,
+                `R$ ${(rental.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
+                new Date(rental.data_referencia).toLocaleDateString('pt-BR'),
+                rental.status || 'N/A'
             ]);
 
             this.alugueisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Imóvel', 'Inquilino', 'Valor', 'Data Início', 'Status'],
+                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Valor', 'Data Referência', 'Status'],
                 columns: [
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
@@ -306,10 +394,13 @@ class DashboardManager {
                         readOnly: true,
                         renderer: function(instance, td, row, col, prop, value) {
                             Handsontable.renderers.TextRenderer.apply(this, arguments);
-                            if (value === 'ativo') {
+                            if (value === 'recebido') {
                                 td.style.backgroundColor = '#dcfce7';
                                 td.style.color = '#166534';
-                            } else if (value === 'vencido') {
+                            } else if (value === 'pendente') {
+                                td.style.backgroundColor = '#fef3c7';
+                                td.style.color = '#92400e';
+                            } else if (value === 'atrasado') {
                                 td.style.backgroundColor = '#fef2f2';
                                 td.style.color = '#dc2626';
                             }
