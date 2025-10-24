@@ -1,12 +1,18 @@
 // Participações JavaScript
 class ParticipacoesManager {
     constructor() {
-        this.apiClient = window.apiClient;
-        this.participacoesTable = null;
-        this.currentParticipacao = null;
-        this.imoveis = [];
-        this.proprietarios = [];
-        this.init();
+        // Aguardar API estar pronta antes de inicializar
+        if (window.apiClient) {
+            this.apiClient = window.apiClient;
+            this.participacoesTable = null;
+            this.init();
+        } else {
+            window.addEventListener('apiReady', (event) => {
+                this.apiClient = event.detail;
+                this.participacoesTable = null;
+                this.init();
+            });
+        }
     }
 
     async init() {

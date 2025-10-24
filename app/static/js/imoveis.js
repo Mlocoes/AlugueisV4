@@ -1,10 +1,20 @@
 // Imóveis JavaScript
 class ImoveisManager {
     constructor() {
-        this.apiClient = window.apiClient;
-        this.imoveisTable = null;
-        this.currentImovel = null;
-        this.init();
+        // Aguardar API estar pronta antes de inicializar
+        if (window.apiClient) {
+            this.apiClient = window.apiClient;
+            this.imoveisTable = null;
+            this.currentImovel = null;
+            this.init();
+        } else {
+            window.addEventListener('apiReady', (event) => {
+                this.apiClient = event.detail;
+                this.imoveisTable = null;
+                this.currentImovel = null;
+                this.init();
+            });
+        }
     }
 
     async init() {

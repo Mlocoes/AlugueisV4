@@ -1,8 +1,16 @@
 // Relatórios JavaScript
 class RelatoriosManager {
     constructor() {
-        this.apiClient = window.apiClient;
-        this.init();
+        // Aguardar API estar pronta antes de inicializar
+        if (window.apiClient) {
+            this.apiClient = window.apiClient;
+            this.init();
+        } else {
+            window.addEventListener('apiReady', (event) => {
+                this.apiClient = event.detail;
+                this.init();
+            });
+        }
     }
 
     async init() {

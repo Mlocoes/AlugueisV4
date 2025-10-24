@@ -1,9 +1,18 @@
 // Proprietários JavaScript
 class ProprietariosManager {
     constructor() {
-        this.apiClient = window.apiClient;
-        this.proprietariosTable = null;
-        this.init();
+        // Aguardar API estar pronta antes de inicializar
+        if (window.apiClient) {
+            this.apiClient = window.apiClient;
+            this.proprietariosTable = null;
+            this.init();
+        } else {
+            window.addEventListener('apiReady', (event) => {
+                this.apiClient = event.detail;
+                this.proprietariosTable = null;
+                this.init();
+            });
+        }
     }
 
     async init() {

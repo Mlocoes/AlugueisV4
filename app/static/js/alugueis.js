@@ -1,12 +1,18 @@
 // Aluguéis JavaScript
 class AlugueisManager {
     constructor() {
-        this.apiClient = window.apiClient;
-        this.alugueisTable = null;
-        this.currentAluguel = null;
-        this.imoveis = [];
-        this.proprietarios = [];
-        this.init();
+        // Aguardar API estar pronta antes de inicializar
+        if (window.apiClient) {
+            this.apiClient = window.apiClient;
+            this.alugueisTable = null;
+            this.init();
+        } else {
+            window.addEventListener('apiReady', (event) => {
+                this.apiClient = event.detail;
+                this.alugueisTable = null;
+                this.init();
+            });
+        }
     }
 
     async init() {

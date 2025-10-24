@@ -403,6 +403,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // Criar instância global do ApiClient
     window.apiClient = new ApiClient();
 
+    // Disparar evento quando API estiver pronta
+    window.dispatchEvent(new CustomEvent('apiReady', { detail: window.apiClient }));
+
     // Mobile menu toggle
     const mobileMenuButton = document.querySelector('[aria-controls="mobile-menu"]');
     const mobileMenu = document.getElementById('mobile-menu');
