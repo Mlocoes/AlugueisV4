@@ -24,6 +24,5 @@ class AluguelMensal(Base):
     valor_total = Column(Numeric(12, 2), nullable=False)  # Valor total do aluguel do imóvel
     valor_proprietario = Column(Numeric(12, 2), nullable=False)  # Valor que cabe ao proprietário
     taxa_administracao = Column(Numeric(10, 2), default=0)  # Taxa de administração
-    status = Column(String(20), default='pendente')  # pendente, recebido, atrasado
     criado_em = Column(TIMESTAMP, server_default=func.now())
     atualizado_em = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())

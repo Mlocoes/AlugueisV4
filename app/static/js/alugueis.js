@@ -69,7 +69,6 @@ class AlugueisManager {
         document.getElementById('clear-filters-btn').addEventListener('click', () => this.clearFilters());
         this.loadSavedFilters();
         document.getElementById('filter-imovel').addEventListener('change', () => this.saveFilters());
-        document.getElementById('filter-status').addEventListener('change', () => this.saveFilters());
         document.getElementById('filter-mes').addEventListener('change', () => this.saveFilters());
     }
 
@@ -159,7 +158,6 @@ class AlugueisManager {
                     aluguel.valor_total,
                     aluguel.valor_proprietario,
                     aluguel.taxa_administracao,
-                    aluguel.status || 'pendente',
                     'Ações'
                 ];
             });
@@ -168,7 +166,7 @@ class AlugueisManager {
 
             this.alugueisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Data Ref.', 'Valor Total', 'Valor Prop.', 'Taxa Admin', 'Status', 'Ações'],
+                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Data Ref.', 'Valor Total', 'Valor Prop.', 'Taxa Admin', 'Ações'],
                 columns: [
                     { type: 'text', readOnly: true }, // ID
                     { type: 'text', readOnly: true }, // Imóvel (não editável)
@@ -191,31 +189,6 @@ class AlugueisManager {
                         type: 'numeric',
                         readOnly: !isAdmin
                     }, // Taxa Administração
-                    {
-                        type: 'dropdown',
-                        source: ['ativo', 'finalizado', 'cancelado', 'pendente'],
-                        readOnly: !isAdmin,
-                        renderer: function(instance, td, row, col, prop, value) {
-                            Handsontable.renderers.DropdownRenderer.apply(this, arguments);
-                            if (value === 'ativo') {
-                                td.style.backgroundColor = '#dcfce7';
-                                td.style.color = '#166534';
-                                td.textContent = 'Ativo';
-                            } else if (value === 'finalizado') {
-                                td.style.backgroundColor = '#dbeafe';
-                                td.style.color = '#1e40af';
-                                td.textContent = 'Finalizado';
-                            } else if (value === 'cancelado') {
-                                td.style.backgroundColor = '#fef2f2';
-                                td.style.color = '#dc2626';
-                                td.textContent = 'Cancelado';
-                            } else if (value === 'pendente') {
-                                td.style.backgroundColor = '#fff3cd';
-                                td.style.color = '#856404';
-                                td.textContent = 'Pendente';
-                            }
-                        }
-                    }, // Status
                     {
                         type: 'text',
                         readOnly: true,
@@ -246,7 +219,7 @@ class AlugueisManager {
                 },
                 cells: function(row, col) {
                     const cellProperties = {};
-                    if (!isAdmin && col !== 0 && col !== 1 && col !== 8) {
+                    if (!isAdmin && col !== 0 && col !== 1 && col !== 6) {
                         cellProperties.className = 'htDimmed';
                     }
                     return cellProperties;
@@ -275,8 +248,7 @@ class AlugueisManager {
                 3: 'valor_aluguel',
                 4: 'dia_vencimento',
                 5: 'data_inicio',
-                6: 'data_fim',
-                7: 'status'
+                6: 'data_fim'
             };
 
             const fieldName = columnMap[col];
@@ -297,7 +269,6 @@ class AlugueisManager {
                 dia_vencimento: parseInt(rowData[4]) || 1,
                 data_inicio: rowData[5],
                 data_fim: rowData[6] || null,
-                status: rowData[7],
                 observacoes: originalAluguel.observacoes || ''
             };
 
@@ -357,7 +328,6 @@ class AlugueisManager {
     saveFilters() {
         const filters = {
             imovel: document.getElementById('filter-imovel').value,
-            status: document.getElementById('filter-status').value,
             mes: document.getElementById('filter-mes').value
         };
         
@@ -373,15 +343,12 @@ class AlugueisManager {
                 if (filters.imovel) {
                     document.getElementById('filter-imovel').value = filters.imovel;
                 }
-                if (filters.status) {
-                    document.getElementById('filter-status').value = filters.status;
-                }
                 if (filters.mes) {
                     document.getElementById('filter-mes').value = filters.mes;
                 }
                 
                 // Aplicar filtros salvos
-                if (filters.imovel || filters.status || filters.mes) {
+                if (filters.imovel || filters.mes) {
                     this.searchAlugueis();
                 }
             } catch (error) {
@@ -392,13 +359,11 @@ class AlugueisManager {
 
     async searchAlugueis() {
         const imovelId = document.getElementById('filter-imovel').value;
-        const status = document.getElementById('filter-status').value;
         const mes = document.getElementById('filter-mes').value;
 
         let url = '/alugueis?';
         const params = [];
         if (imovelId) params.push(`imovel_id=${imovelId}`);
-        if (status && status !== '') params.push(`status=${status}`);
         if (mes) params.push(`mes_referencia=${mes}`);
 
         url += params.join('&');
@@ -423,7 +388,6 @@ class AlugueisManager {
                 aluguel.dia_vencimento,
                 new Date(aluguel.data_inicio).toLocaleDateString('pt-BR'),
                 aluguel.data_fim ? new Date(aluguel.data_fim).toLocaleDateString('pt-BR') : 'N/A',
-                aluguel.status,
                 'Editar | Excluir'
             ];
         });
@@ -448,7 +412,6 @@ class AlugueisManager {
             form['dia_vencimento'].value = aluguel.dia_vencimento;
             form['data_inicio'].value = new Date(aluguel.data_inicio).toISOString().split('T')[0];
             form['data_fim'].value = aluguel.data_fim ? new Date(aluguel.data_fim).toISOString().split('T')[0] : '';
-            form['status'].value = aluguel.status;
             form['taxa_administracao'].value = aluguel.taxa_administracao || '';
             form['observacoes'].value = aluguel.observacoes || '';
         } else {

@@ -15,10 +15,15 @@ def main():
         formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
+        "--drop",
+        action="store_true",
+        help="Apaga a tabela completamente em vez de apenas limpar o conteúdo."
+    )
+    parser.add_argument(
         "table_name",
         nargs='?',
         default=None,
-        help="O nome da tabela a ser apagada. Se não for fornecido, lista as tabelas."
+        help="O nome da tabela a ser limpa. Se não for fornecido, lista as tabelas."
     )
     parser.add_argument(
         "--list",
@@ -41,8 +46,10 @@ def main():
 
     if args.list or not args.table_name:
         list_tables(engine)
+    elif args.drop:
+        drop_table(engine, args.table_name)
     else:
-        delete_table(engine, args.table_name)
+        clear_table(engine, args.table_name)
 
 def list_tables(engine):
     """Lista todas as tabelas no banco de dados."""
@@ -59,8 +66,8 @@ def list_tables(engine):
         print(f"\nErro ao conectar ou ler o banco de dados: {e}")
         sys.exit(1)
 
-def delete_table(engine, table_name: str):
-    """Apaga uma tabela específica do banco de dados após confirmação."""
+def drop_table(engine, table_name: str):
+    """Apaga completamente uma tabela específica do banco de dados após confirmação."""
     meta = MetaData()
     try:
         meta.reflect(bind=engine)
@@ -75,6 +82,7 @@ def delete_table(engine, table_name: str):
         print("\n" + "="*50)
         print(f"ATENÇÃO: Você está prestes a apagar permanentemente a tabela '{table_name}'.")
         print("Esta ação não pode ser desfeita e todos os dados serão perdidos.")
+        print("A estrutura da tabela também será removida.")
         print("="*50 + "\n")
         
         confirm = input(f"Digite '{table_name}' para confirmar a exclusão: ")
@@ -84,6 +92,43 @@ def delete_table(engine, table_name: str):
             print(f"\n✅ Tabela '{table_name}' apagada com sucesso.")
         else:
             print("\n❌ Operação cancelada. A tabela não foi apagada.")
+
+    except SQLAlchemyError as e:
+        print(f"\nErro durante a operação: {e}")
+        sys.exit(1)
+
+def clear_table(engine, table_name: str):
+    """Limpa todo o conteúdo de uma tabela específica do banco de dados após confirmação."""
+    try:
+        with engine.connect() as conn:
+            # Verifica se a tabela existe
+            result = conn.execute(f"SELECT EXISTS (SELECT 1 FROM information_schema.tables WHERE table_name = '{table_name}')")
+            exists = result.fetchone()[0]
+            
+            if not exists:
+                print(f"\nErro: A tabela '{table_name}' não existe no banco de dados.")
+                list_tables(engine)
+                return
+
+            # Conta os registros antes de limpar
+            result = conn.execute(f"SELECT COUNT(*) FROM {table_name}")
+            count_before = result.fetchone()[0]
+
+            print("\n" + "="*50)
+            print(f"ATENÇÃO: Você está prestes a limpar todo o conteúdo da tabela '{table_name}'.")
+            print(f"A tabela contém {count_before} registros.")
+            print("Esta ação não pode ser desfeita, mas a estrutura da tabela será mantida.")
+            print("="*50 + "\n")
+            
+            confirm = input(f"Digite '{table_name}' para confirmar a limpeza: ")
+
+            if confirm == table_name:
+                # Limpa a tabela
+                conn.execute(f"TRUNCATE TABLE {table_name} RESTART IDENTITY CASCADE")
+                print(f"\n✅ Tabela '{table_name}' limpa com sucesso.")
+                print(f"   {count_before} registros foram removidos.")
+            else:
+                print("\n❌ Operação cancelada. A tabela não foi alterada.")
 
     except SQLAlchemyError as e:
         print(f"\nErro durante a operação: {e}")

@@ -380,36 +380,18 @@ class DashboardManager {
                 `Imóvel ${rental.id_imovel}`,
                 `Proprietário ${rental.id_proprietario}`,
                 `R$ ${(rental.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                new Date(rental.data_referencia).toLocaleDateString('pt-BR'),
-                rental.status || 'N/A'
+                new Date(rental.data_referencia).toLocaleDateString('pt-BR')
             ]);
 
             this.alugueisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Valor', 'Data Referência', 'Status'],
+                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Valor', 'Data Referência'],
                 columns: [
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
-                    { type: 'text', readOnly: true },
-                    {
-                        type: 'text',
-                        readOnly: true,
-                        renderer: function(instance, td, row, col, prop, value) {
-                            Handsontable.renderers.TextRenderer.apply(this, arguments);
-                            if (value === 'recebido') {
-                                td.style.backgroundColor = '#dcfce7';
-                                td.style.color = '#166534';
-                            } else if (value === 'pendente') {
-                                td.style.backgroundColor = '#fef3c7';
-                                td.style.color = '#92400e';
-                            } else if (value === 'atrasado') {
-                                td.style.backgroundColor = '#fef2f2';
-                                td.style.color = '#dc2626';
-                            }
-                        }
-                    }
+                    { type: 'text', readOnly: true }
                 ],
                 height: 300,
                 readOnly: true,
