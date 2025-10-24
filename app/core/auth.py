@@ -58,3 +58,25 @@ def get_current_active_user(current_user: Usuario = Depends(get_current_user)):
     if not current_user.ativo:
         raise HTTPException(status_code=400, detail="Inactive user")
     return current_user
+
+def refresh_access_token(token: str):
+    """Verifica se o token precisa ser renovado e retorna um novo se necessário"""
+    try:
+        payload = jwt.decode(token, settings.secret_key, algorithms=[settings.algorithm])
+        exp = payload.get("exp")
+        now = datetime.utcnow().timestamp()
+        
+        # Se faltar menos de 30 minutos para expirar, renovar
+        if exp - now < 30 * 60:
+            username = payload.get("sub")
+            if username:
+                # Criar novo token
+                access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+                new_token = create_access_token(
+                    data={"sub": username}, expires_delta=access_token_expires
+                )
+                return new_token
+    except JWTError:
+        pass
+    
+    return None

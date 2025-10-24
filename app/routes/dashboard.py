@@ -23,29 +23,33 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     # Contar imóveis
     total_imoveis = db.query(Imovel).count()
     
-    # Receita do mês atual
+    # Receita do mês atual (apenas recebidos)
     hoje = datetime.now()
     receita_mensal = db.query(func.sum(AluguelMensal.valor_total)).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
-        extract('month', AluguelMensal.data_referencia) == hoje.month
+        extract('month', AluguelMensal.data_referencia) == hoje.month,
+        AluguelMensal.status == 'recebido'
     ).scalar() or 0
     
-    # Aluguéis ativos (registros do mês atual)
+    # Aluguéis ativos (registros recebidos do mês atual)
     alugueis_ativos = db.query(func.count(func.distinct(AluguelMensal.id))).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
-        extract('month', AluguelMensal.data_referencia) == hoje.month
+        extract('month', AluguelMensal.data_referencia) == hoje.month,
+        AluguelMensal.status == 'recebido'
     ).scalar() or 0
     
-    # Proprietários ativos (que têm aluguéis no mês atual)
+    # Proprietários ativos (que têm aluguéis recebidos no mês atual)
     proprietarios_ativos = db.query(func.count(func.distinct(AluguelMensal.id_proprietario))).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
-        extract('month', AluguelMensal.data_referencia) == hoje.month
+        extract('month', AluguelMensal.data_referencia) == hoje.month,
+        AluguelMensal.status == 'recebido'
     ).scalar() or 0
     
-    # Taxa de ocupação (imóveis com aluguel / total imóveis)
+    # Taxa de ocupação (imóveis com aluguel recebido / total imóveis)
     imoveis_ocupados = db.query(func.count(func.distinct(AluguelMensal.id_imovel))).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
-        extract('month', AluguelMensal.data_referencia) == hoje.month
+        extract('month', AluguelMensal.data_referencia) == hoje.month,
+        AluguelMensal.status == 'recebido'
     ).scalar() or 0
     
     taxa_ocupacao = (imoveis_ocupados / total_imoveis * 100) if total_imoveis > 0 else 0
@@ -80,10 +84,11 @@ def get_dashboard_charts(db: Session = Depends(get_db), current_user: Usuario = 
         ano = mes_referencia.year
         mes = mes_referencia.month
         
-        # Calcular receita total do mês
+        # Calcular receita total do mês (apenas recebidos)
         receita_mes = db.query(func.sum(AluguelMensal.valor_total)).filter(
             extract('year', AluguelMensal.data_referencia) == ano,
-            extract('month', AluguelMensal.data_referencia) == mes
+            extract('month', AluguelMensal.data_referencia) == mes,
+            AluguelMensal.status == 'recebido'
         ).scalar() or 0
         
         receita_por_mes.append({
@@ -120,11 +125,11 @@ def get_dashboard_charts(db: Session = Depends(get_db), current_user: Usuario = 
         for tipo, quantidade in tipos_imoveis
     ]
     
-    # Gráfico de receita por proprietário (top 5)
+    # Gráfico de receita por proprietário (top 5) - apenas recebidos
     receita_proprietarios = db.query(
         AluguelMensal.id_proprietario,
         func.sum(AluguelMensal.valor_proprietario).label('total_receita')
-    ).group_by(AluguelMensal.id_proprietario).order_by(
+    ).filter(AluguelMensal.status == 'recebido').group_by(AluguelMensal.id_proprietario).order_by(
         func.sum(AluguelMensal.valor_proprietario).desc()
     ).limit(5).all()
     

@@ -94,10 +94,8 @@ class ImoveisManager {
                 imovel.nome,
                 imovel.tipo,
                 imovel.endereco,
-                imovel.cidade,
-                imovel.estado || '',
-                imovel.status,
-                imovel.valor_aluguel || 0,
+                imovel.alugado ? 'alugado' : 'disponivel',
+                imovel.valor_mercado || 0,
                 'Ações'
             ]);
 
@@ -105,21 +103,19 @@ class ImoveisManager {
 
             this.imoveisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Nome', 'Tipo', 'Endereço', 'Cidade', 'Estado', 'Status', 'Valor Aluguel (R$)', 'Ações'],
+                colHeaders: ['ID', 'Nome', 'Tipo', 'Endereço', 'Status', 'Valor Mercado (R$)', 'Ações'],
                 columns: [
                     { type: 'text', readOnly: true }, // ID
                     { type: 'text', readOnly: !isAdmin }, // Nome
                     { 
                         type: 'dropdown',
-                        source: ['casa', 'apartamento', 'comercial', 'terreno'],
+                        source: ['Comercial', 'Residencial'],
                         readOnly: !isAdmin
                     }, // Tipo
                     { type: 'text', readOnly: !isAdmin }, // Endereço
-                    { type: 'text', readOnly: !isAdmin }, // Cidade
-                    { type: 'text', readOnly: !isAdmin }, // Estado
                     {
                         type: 'dropdown',
-                        source: ['disponivel', 'alugado', 'manutencao'],
+                        source: ['disponivel', 'alugado'],
                         readOnly: !isAdmin,
                         renderer: function(instance, td, row, col, prop, value) {
                             Handsontable.renderers.DropdownRenderer.apply(this, arguments);
@@ -131,18 +127,14 @@ class ImoveisManager {
                                 td.style.backgroundColor = '#dbeafe';
                                 td.style.color = '#1e40af';
                                 td.textContent = 'Alugado';
-                            } else if (value === 'manutencao') {
-                                td.style.backgroundColor = '#fef3c7';
-                                td.style.color = '#92400e';
-                                td.textContent = 'Manutenção';
                             }
                         }
-                    }, // Status
+                    }, // Status (alugado)
                     { 
                         type: 'numeric',
                         numericFormat: { pattern: '0,0.00' },
                         readOnly: !isAdmin
-                    }, // Valor Aluguel
+                    }, // Valor Mercado
                     {
                         type: 'text',
                         readOnly: true,
@@ -167,8 +159,11 @@ class ImoveisManager {
                 stretchH: 'all',
                 licenseKey: 'non-commercial-and-evaluation',
                 afterChange: (changes, source) => {
-                    if (source === 'edit' && isAdmin) {
-                        this.handleCellChange(changes);
+                    if (source === 'edit' && isAdmin && changes) {
+                        // Chamar assincronamente sem bloquear o Handsontable
+                        setTimeout(() => {
+                            this.handleCellChange(changes);
+                        }, 0);
                     }
                 },
                 cells: function(row, col) {
@@ -196,14 +191,13 @@ class ImoveisManager {
             const rowData = this.imoveisTable.getDataAtRow(row);
             const imovelId = rowData[0];
             
-            // Mapeamento de colunas
+            // Mapeamento de colunas para campos do backend
             const columnMap = {
-                1: 'tipo',
-                2: 'endereco',
-                3: 'cidade',
-                4: 'estado',
-                5: 'status',
-                6: 'valor_aluguel'
+                1: 'nome',        // Nome
+                2: 'tipo',        // Tipo
+                3: 'endereco',    // Endereço
+                4: 'alugado',     // Status (mapeado para alugado)
+                5: 'valor_mercado' // Valor Mercado
             };
 
             const fieldName = columnMap[col];
@@ -213,24 +207,26 @@ class ImoveisManager {
             const originalImovel = this.imoveisData.find(i => i.id === imovelId);
             if (!originalImovel) continue;
 
-            // Preparar dados para atualização
-            const updatedData = {
-                tipo: rowData[1],
-                endereco: rowData[2],
-                cidade: rowData[3],
-                estado: rowData[4],
-                cep: originalImovel.cep || '',
-                status: rowData[5],
-                area: originalImovel.area,
-                quartos: originalImovel.quartos,
-                banheiros: originalImovel.banheiros,
-                vagas_garagem: originalImovel.vagas_garagem,
-                valor_aluguel: parseFloat(rowData[6]) || 0,
-                valor_venda: originalImovel.valor_venda,
-                descricao: originalImovel.descricao || ''
-            };
+            // Preparar dados para atualização baseado no campo
+            let updatedData = {};
+
+            if (fieldName === 'nome') {
+                updatedData.nome = rowData[1];
+            } else if (fieldName === 'tipo') {
+                updatedData.tipo = rowData[2];
+            } else if (fieldName === 'endereco') {
+                updatedData.endereco = rowData[3];
+            } else if (fieldName === 'alugado') {
+                // Mapear status para boolean alugado
+                updatedData.alugado = rowData[4] === 'alugado';
+            } else if (fieldName === 'valor_mercado') {
+                updatedData.valor_mercado = parseFloat(rowData[5]) || 0;
+            }
 
             try {
+                // Verificar se o token ainda é válido
+                await this.apiClient.ensureValidToken();
+
                 // Feedback visual: célula amarela (salvando)
                 const cell = this.imoveisTable.getCell(row, col);
                 if (cell) {
@@ -249,7 +245,9 @@ class ImoveisManager {
                 }
 
                 // Atualizar dados originais
-                Object.assign(originalImovel, updatedData);
+                if (originalImovel) {
+                    Object.assign(originalImovel, updatedData);
+                }
 
                 console.log(`✓ Imóvel ${imovelId} atualizado: ${fieldName} = ${newValue}`);
 
@@ -270,191 +268,182 @@ class ImoveisManager {
         }
     }
 
-    clearFilters() {
-        // Limpar os campos de filtro
-        document.getElementById('search-endereco').value = '';
-        document.getElementById('filter-tipo').value = '';
-        document.getElementById('filter-status').value = '';
-        
-        // Limpar localStorage
-        localStorage.removeItem('imoveis_filters');
-        
-        // Recarregar todos os dados
-        this.loadImoveis();
-    }
-
-    saveFilters() {
-        const filters = {
-            endereco: document.getElementById('search-endereco').value,
-            tipo: document.getElementById('filter-tipo').value,
-            status: document.getElementById('filter-status').value
-        };
-        
-        localStorage.setItem('imoveis_filters', JSON.stringify(filters));
-    }
-
-    loadSavedFilters() {
-        const saved = localStorage.getItem('imoveis_filters');
-        if (saved) {
-            try {
-                const filters = JSON.parse(saved);
-                
-                if (filters.endereco) {
-                    document.getElementById('search-endereco').value = filters.endereco;
-                }
-                if (filters.tipo) {
-                    document.getElementById('filter-tipo').value = filters.tipo;
-                }
-                if (filters.status) {
-                    document.getElementById('filter-status').value = filters.status;
-                }
-                
-                // Aplicar filtros salvos
-                if (filters.endereco || filters.tipo || filters.status) {
-                    this.searchImoveis();
-                }
-            } catch (error) {
-                console.error('Erro ao carregar filtros salvos:', error);
-            }
-        }
-    }
-
-    async searchImoveis() {
-        const endereco = document.getElementById('search-endereco').value;
-        const tipo = document.getElementById('filter-tipo').value;
-        const status = document.getElementById('filter-status').value;
-
-        let url = '/imoveis?';
-        const params = [];
-        if (endereco) params.push(`endereco=${encodeURIComponent(endereco)}`);
-        if (tipo && tipo !== '') params.push(`tipo=${tipo}`);
-        if (status && status !== '') params.push(`status=${status}`);
-
-        url += params.join('&');
-
-        try {
-            const imoveis = await this.apiClient.get(url);
-            this.updateTable(imoveis);
-        } catch (error) {
-            console.error('Erro ao buscar imóveis:', error);
-        }
-    }
-
-    updateTable(imoveis) {
-        // Atualizar dados originais
-        this.imoveisData = imoveis;
-
-        const data = imoveis.map(imovel => [
-            imovel.id,
-            imovel.nome,
-            imovel.tipo,
-            imovel.endereco,
-            imovel.cidade,
-            imovel.estado || '',
-            imovel.status,
-            imovel.valor_aluguel || 0,
-            'Ações'
-        ]);
-
-        this.imoveisTable.loadData(data);
-    }
-
-    showModal(imovel = null) {
-        this.currentImovel = imovel;
-        const modal = document.getElementById('imovel-modal');
-        const form = document.getElementById('imovel-form');
-        const title = document.getElementById('modal-title');
-
-        if (imovel) {
-            title.textContent = 'Editar Imóvel';
-            form['id'].value = imovel.id;
-            form['nome'].value = imovel.nome;
-            form['tipo'].value = imovel.tipo;
-            form['status'].value = imovel.status;
-            form['endereco'].value = imovel.endereco;
-            form['cidade'].value = imovel.cidade;
-            form['estado'].value = imovel.estado;
-            form['cep'].value = imovel.cep || '';
-            form['area'].value = imovel.area || '';
-            form['quartos'].value = imovel.quartos || '';
-            form['banheiros'].value = imovel.banheiros || '';
-            form['vagas_garagem'].value = imovel.vagas_garagem || '';
-            form['valor_aluguel'].value = imovel.valor_aluguel || '';
-            form['valor_venda'].value = imovel.valor_venda || '';
-            form['descricao'].value = imovel.descricao || '';
-        } else {
-            title.textContent = 'Novo Imóvel';
-            form.reset();
-            form['id'].value = '';
-        }
-
-        modal.classList.remove('hidden');
-    }
-
-    hideModal() {
-        document.getElementById('imovel-modal').classList.add('hidden');
-        this.currentImovel = null;
-    }
-
-    async saveImovel(event) {
-        event.preventDefault();
-
-        const form = document.getElementById('imovel-form');
-        const formData = new FormData(form);
-
-        const imovelData = {
-            nome: formData.get('nome'),
-            endereco: formData.get('endereco'),
-            alugado: formData.get('status') === 'alugado',
-            ativo: true
-        };
-
-        try {
-            if (this.currentImovel) {
-                await this.apiClient.put(`/api/imoveis/${this.currentImovel.id}/`, imovelData);
-            } else {
-                await this.apiClient.post('/api/imoveis/', imovelData);
-            }
-
-            this.hideModal();
-            await this.loadImoveis();
-            alert('Imóvel salvo com sucesso!');
-
-        } catch (error) {
-            console.error('Erro ao salvar imóvel:', error);
-            alert('Erro ao salvar imóvel. Tente novamente.');
-        }
-    }
-
-    async editImovel(id) {
-        try {
-            const imovel = await this.apiClient.get(`/imoveis/${id}`);
-            this.showModal(imovel);
-        } catch (error) {
-            console.error('Erro ao carregar imóvel:', error);
-        }
-    }
-
-    async deleteImovel(id) {
+    async deleteImovel(imovelId) {
         if (!confirm('Tem certeza que deseja excluir este imóvel?')) {
             return;
         }
 
         try {
-            await this.apiClient.delete(`/api/imoveis/${id}/`);
-            await this.loadImoveis();
-            alert('Imóvel excluído com sucesso!');
+            await this.apiClient.delete(`/api/imoveis/${imovelId}/`);
+            utils.showAlert('Imóvel excluído com sucesso!', 'success');
+            this.loadImoveis();
         } catch (error) {
             console.error('Erro ao excluir imóvel:', error);
-            alert('Erro ao excluir imóvel. Tente novamente.');
+            utils.showAlert('Erro ao excluir imóvel. Tente novamente.', 'error');
         }
+    }
+
+    showModal(imovel = null) {
+        this.currentImovel = imovel;
+
+        if (imovel) {
+            // Editar imóvel
+            document.getElementById('modal-title').textContent = 'Editar Imóvel';
+            document.getElementById('save-btn').textContent = 'Salvar';
+            document.getElementById('imovel-id').value = imovel.id;
+            document.getElementById('nome').value = imovel.nome;
+            document.getElementById('tipo').value = imovel.tipo;
+            document.getElementById('endereco').value = imovel.endereco;
+            document.getElementById('alugado').checked = imovel.alugado;
+            document.getElementById('valor_mercado').value = imovel.valor_mercado;
+        } else {
+            // Novo imóvel
+            document.getElementById('modal-title').textContent = 'Adicionar Novo Imóvel';
+            document.getElementById('save-btn').textContent = 'Adicionar';
+            document.getElementById('imovel-id').value = '';
+            document.getElementById('nome').value = '';
+            document.getElementById('tipo').value = 'Residencial';
+            document.getElementById('endereco').value = '';
+            document.getElementById('alugado').checked = false;
+            document.getElementById('valor_mercado').value = '';
+        }
+
+        const modal = new bootstrap.Modal(document.getElementById('imovelModal'));
+        modal.show();
+    }
+
+    hideModal() {
+        const modal = bootstrap.Modal.getInstance(document.getElementById('imovelModal'));
+        if (modal) {
+            modal.hide();
+        }
+    }
+
+    async saveImovel(event) {
+        event.preventDefault();
+
+        const imovelId = document.getElementById('imovel-id').value;
+        const nome = document.getElementById('nome').value;
+        const tipo = document.getElementById('tipo').value;
+        const endereco = document.getElementById('endereco').value;
+        const alugado = document.getElementById('alugado').checked;
+        const valor_mercado = parseFloat(document.getElementById('valor_mercado').value.replace(',', '.')) || 0;
+
+        if (!nome || !tipo || !endereco) {
+            return utils.showAlert('Por favor, preencha todos os campos obrigatórios.', 'error');
+        }
+
+        try {
+            // Verificar se o token ainda é válido
+            await this.apiClient.ensureValidToken();
+
+            // Feedback visual: botão de salvar
+            const saveButton = document.getElementById('save-btn');
+            saveButton.classList.add('disabled');
+            saveButton.innerHTML = 'Salvando...';
+
+            let response;
+
+            if (imovelId) {
+                // Atualizar imóvel existente
+                response = await this.apiClient.put(`/api/imoveis/${imovelId}/`, {
+                    nome,
+                    tipo,
+                    endereco,
+                    alugado,
+                    valor_mercado
+                });
+            } else {
+                // Adicionar novo imóvel
+                response = await this.apiClient.post('/api/imoveis/', {
+                    nome,
+                    tipo,
+                    endereco,
+                    alugado,
+                    valor_mercado
+                });
+            }
+
+            this.hideModal();
+            this.loadImoveis();
+
+            utils.showAlert(`Imóvel ${imovelId ? 'atualizado' : 'adicionado'} com sucesso!`, 'success');
+        } catch (error) {
+            console.error('Erro ao salvar imóvel:', error);
+            utils.showAlert('Erro ao salvar imóvel. Tente novamente.', 'error');
+        } finally {
+            const saveButton = document.getElementById('save-btn');
+            saveButton.classList.remove('disabled');
+            saveButton.innerHTML = imovelId ? 'Salvar' : 'Adicionar';
+        }
+    }
+
+    async searchImoveis() {
+        const endereco = document.getElementById('search-endereco').value.trim();
+        const tipo = document.getElementById('filter-tipo').value;
+        const status = document.getElementById('filter-status').value;
+
+        let filteredImoveis = this.imoveisData;
+
+        if (endereco) {
+            filteredImoveis = filteredImoveis.filter(imovel => 
+                imovel.endereco.toLowerCase().includes(endereco.toLowerCase())
+            );
+        }
+
+        if (tipo && tipo !== 'Todos') {
+            filteredImoveis = filteredImoveis.filter(imovel => imovel.tipo === tipo);
+        }
+
+        if (status && status !== 'Todos') {
+            const isAlugado = status === 'alugado';
+            filteredImoveis = filteredImoveis.filter(imovel => imovel.alugado === isAlugado);
+        }
+
+        this.updateTable(filteredImoveis);
+    }
+
+    clearFilters() {
+        document.getElementById('search-endereco').value = '';
+        document.getElementById('filter-tipo').value = 'Todos';
+        document.getElementById('filter-status').value = 'Todos';
+
+        this.updateTable(this.imoveisData);
+    }
+
+    updateTable(data) {
+        this.imoveisTable.loadData(data.map(imovel => [
+            imovel.id,
+            imovel.nome,
+            imovel.tipo,
+            imovel.endereco,
+            imovel.alugado ? 'alugado' : 'disponivel',
+            imovel.valor_mercado || 0,
+            'Ações'
+        ]));
+    }
+
+    loadSavedFilters() {
+        const savedFilters = JSON.parse(localStorage.getItem('imoveisFilters')) || {};
+
+        document.getElementById('search-endereco').value = savedFilters.endereco || '';
+        document.getElementById('filter-tipo').value = savedFilters.tipo || 'Todos';
+        document.getElementById('filter-status').value = savedFilters.status || 'Todos';
+    }
+
+    saveFilters() {
+        const endereco = document.getElementById('search-endereco').value.trim();
+        const tipo = document.getElementById('filter-tipo').value;
+        const status = document.getElementById('filter-status').value;
+
+        const filters = {
+            endereco: endereco || undefined,
+            tipo: tipo !== 'Todos' ? tipo : undefined,
+            status: status !== 'Todos' ? status : undefined
+        };
+
+        localStorage.setItem('imoveisFilters', JSON.stringify(filters));
     }
 }
 
-// Instância global
-let imoveisManager;
-
-// Inicializar quando o DOM estiver carregado
-document.addEventListener('DOMContentLoaded', () => {
-    imoveisManager = new ImoveisManager();
-});
+const imoveisManager = new ImoveisManager();

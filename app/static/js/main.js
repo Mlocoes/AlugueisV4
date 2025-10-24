@@ -6,6 +6,11 @@ class ApiClient {
         this.baseURL = window.location.origin;
         this.token = this.getToken();
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento
+        
+        // Verificar token periodicamente (a cada 5 minutos)
+        setInterval(() => {
+            this.refreshTokenIfNeeded();
+        }, 5 * 60 * 1000);
     }
 
     getToken() {
@@ -156,6 +161,59 @@ class ApiClient {
 
     getUserRole() {
         return localStorage.getItem('userRole') || this.userRole || 'usuario';
+    }
+
+    async isTokenValid() {
+        if (!this.token) return false;
+        
+        try {
+            // Tentar fazer uma requisição simples para verificar se o token é válido
+            await this.get('/auth/me');
+            return true;
+        } catch (error) {
+            if (error.message.includes('401') || error.message.includes('Sessão expirada')) {
+                return false;
+            }
+            // Para outros erros, assumir que o token é válido
+            return true;
+        }
+    }
+
+    async ensureValidToken() {
+        await this.refreshTokenIfNeeded();
+        
+        if (!await this.isTokenValid()) {
+            throw new Error('Sessão expirada. Faça login novamente.');
+        }
+    }
+
+    async refreshTokenIfNeeded() {
+        // Verificar se o token precisa ser renovado (se faltar menos de 30 minutos para expirar)
+        if (this.token) {
+            try {
+                const payload = JSON.parse(atob(this.token.split('.')[1]));
+                const exp = payload.exp * 1000; // converter para milissegundos
+                const now = Date.now();
+                const timeToExpiry = exp - now;
+                
+                // Se faltar menos de 30 minutos, renovar
+                if (timeToExpiry < 30 * 60 * 1000) {
+                    console.log('Token próximo de expirar, renovando...');
+                    try {
+                        const response = await this.post('/auth/refresh');
+                        if (response.access_token) {
+                            this.setToken(response.access_token, localStorage.getItem('token') !== null);
+                            console.log('Token renovado com sucesso');
+                        }
+                    } catch (error) {
+                        console.error('Erro ao renovar token:', error);
+                        // Se falhar, deixar o fluxo continuar - será tratado pelo erro 401
+                    }
+                }
+            } catch (error) {
+                console.error('Erro ao verificar expiração do token:', error);
+            }
+        }
     }
 }
 
