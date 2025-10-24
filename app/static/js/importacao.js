@@ -20,7 +20,7 @@ class ImportManager {
         try {
             await this.checkAuth();
             this.setupEventListeners();
-            utils.showUserInfo();
+            utils.showUserInfo(this.apiClient);
             
         } catch (error) {
             console.error('Erro na inicialização:', error);

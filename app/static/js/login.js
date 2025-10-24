@@ -55,12 +55,12 @@ class LoginManager {
         const passwordInput = document.querySelector('#password');
         const rememberMeInput = document.querySelector('#remember-me');
 
-        const email = emailInput.value.trim();
+        const username = emailInput.value.trim();
         const password = passwordInput.value.trim();
         const rememberMe = rememberMeInput.checked;
 
-        if (!email || !password) {
-            console.error('Campos obrigatórios não preenchidos:', { email: !!email, password: !!password });
+        if (!username || !password) {
+            console.error('Campos obrigatórios não preenchidos:', { username: !!username, password: !!password });
             // Mostrar erro
             const errorMessage = document.getElementById('error-message');
             const errorText = document.getElementById('error-text');
@@ -69,7 +69,7 @@ class LoginManager {
             return;
         }
 
-        console.log('Tentando login com:', { email, password: '***', rememberMe });
+        console.log('Tentando login com:', { username, password: '***', rememberMe });
 
         const errorMessage = document.getElementById('error-message');
         const errorText = document.getElementById('error-text');
@@ -80,7 +80,7 @@ class LoginManager {
 
             // Fazer login
             console.log('Enviando requisição de login...');
-            const response = await this.apiClient.login(email, password);
+            const response = await this.apiClient.login(username, password);
 
             // Salvar token se "lembrar-me" estiver marcado (atualizar storage)
             if (rememberMe) {

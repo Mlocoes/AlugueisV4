@@ -1,6 +1,6 @@
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 # Schemas base
@@ -133,8 +133,8 @@ class AluguelMensalUpdate(BaseModel):
 
 class AluguelMensal(AluguelMensalBase):
     id: int
-    criado_em: Optional[date] = None
-    atualizado_em: Optional[date] = None
+    criado_em: Optional[datetime] = None
+    atualizado_em: Optional[datetime] = None
 
     class Config:
         from_attributes = True

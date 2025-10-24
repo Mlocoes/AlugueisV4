@@ -207,3 +207,22 @@ def delete_aluguel_mensal(
     db.commit()
     
     return {"message": "Aluguel mensal deleted successfully"}
+
+@router.put("/mensais/{aluguel_mensal_id}", response_model=AluguelMensal)
+def update_aluguel_mensal(
+    aluguel_mensal_id: int,
+    aluguel_update: AluguelMensalUpdate,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    db_aluguel = db.query(AluguelMensalModel).filter(AluguelMensalModel.id == aluguel_mensal_id).first()
+    if db_aluguel is None:
+        raise HTTPException(status_code=404, detail="Aluguel mensal not found")
+    
+    update_data = aluguel_update.dict(exclude_unset=True)
+    for field, value in update_data.items():
+        setattr(db_aluguel, field, value)
+    
+    db.commit()
+    db.refresh(db_aluguel)
+    return db_aluguel

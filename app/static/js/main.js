@@ -270,9 +270,15 @@ const utils = {
         }, 5000);
     },
 
-    hideElementsForNonAdmin() {
+    hideElementsForNonAdmin(apiClient) {
+        // Verificar se api está disponível
+        if (!apiClient || !apiClient.isAdmin) {
+            console.warn('API não disponível para controle de acesso');
+            return;
+        }
+        
         // Ocultar elementos que só administradores devem ver
-        if (!api.isAdmin()) {
+        if (!apiClient.isAdmin()) {
             document.querySelectorAll('[data-admin-only]').forEach(el => {
                 el.style.display = 'none';
             });
@@ -290,12 +296,12 @@ const utils = {
         }
     },
 
-    showUserInfo() {
+    showUserInfo(apiClient) {
         // Atualizar informações do usuário na interface
         const userInfoElement = document.getElementById('user-info');
-        if (userInfoElement) {
-            const userName = api.getUserName();
-            const role = api.getUserRole();
+        if (userInfoElement && apiClient) {
+            const userName = apiClient.getUserName();
+            const role = apiClient.getUserRole();
             const roleLabel = role === 'administrador' ? '👑 Admin' : '👤 Usuário';
             userInfoElement.innerHTML = `
                 <span class="font-medium">${userName}</span>

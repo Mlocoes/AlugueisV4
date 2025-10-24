@@ -23,8 +23,8 @@ class DashboardManager {
         this.setupEventListeners();
         await this.loadDashboardData();
         // Aplicar controle de acesso
-        utils.hideElementsForNonAdmin();
-        utils.showUserInfo();
+        utils.hideElementsForNonAdmin(this.apiClient);
+        utils.showUserInfo(this.apiClient);
     }
 
     async tryAutoLogin() {
@@ -32,7 +32,7 @@ class DashboardManager {
         try {
             // Tentar login com credenciais de teste
             const formData = new FormData();
-            formData.append('username', 'admin@example.com');
+            formData.append('username', 'admin');
             formData.append('password', 'admin00');
 
             const response = await fetch('/auth/login', {

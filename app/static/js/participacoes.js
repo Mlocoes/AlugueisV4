@@ -21,8 +21,8 @@ class ParticipacoesManager {
         this.setupEventListeners();
         
         // Controle de acesso baseado em papel
-        utils.hideElementsForNonAdmin();
-        utils.showUserInfo();
+        utils.hideElementsForNonAdmin(this.apiClient);
+        utils.showUserInfo(this.apiClient);
     }
 
     async checkAuth() {

@@ -21,8 +21,8 @@ class AlugueisManager {
         await this.loadData();
         
         // Controle de acesso baseado em papel
-        utils.hideElementsForNonAdmin();
-        utils.showUserInfo();
+        utils.hideElementsForNonAdmin(this.apiClient);
+        utils.showUserInfo(this.apiClient);
     }
 
     async checkAuth() {
@@ -83,11 +83,14 @@ class AlugueisManager {
     }
 
     async loadData() {
+        // Carregar dependências primeiro
         await Promise.all([
             this.loadImoveis(),
-            this.loadProprietarios(),
-            this.loadAlugueis()
+            this.loadProprietarios()
         ]);
+        
+        // Depois carregar aluguéis (que depende dos dados acima)
+        await this.loadAlugueis();
     }
 
     async loadImoveis() {
