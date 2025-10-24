@@ -6,14 +6,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 def main():
     """Função principal do script."""
-    # Constrói o caminho absoluto para o diretório onde o script está localizado
-    script_dir = os.path.dirname(os.path.abspath(__file__))
     
-    # Constrói o caminho absoluto para o arquivo de banco de dados
-    db_path = os.path.join(script_dir, 'alugueis.db')
-    
-    # Define a URL de conexão do SQLAlchemy
-    database_url = f"sqlite:///{db_path}"
+    # URL do banco de dados PostgreSQL (Docker)
+    database_url = "postgresql://alugueis_user:alugueis_password@localhost:5432/alugueis"
 
     parser = argparse.ArgumentParser(
         description="Script para listar ou apagar tabelas do banco de dados da aplicação AlugueisV4.",
@@ -33,15 +28,15 @@ def main():
 
     args = parser.parse_args()
 
-    if not os.path.exists(db_path):
-        print(f"Erro: O arquivo de banco de dados não foi encontrado no caminho esperado:")
-        print(db_path)
-        sys.exit(1)
-
     try:
         engine = create_engine(database_url)
+        # Testa a conexão
+        with engine.connect() as conn:
+            print("✅ Conexão com o banco de dados PostgreSQL estabelecida com sucesso.")
     except Exception as e:
-        print(f"Erro ao criar a engine do SQLAlchemy: {e}")
+        print(f"❌ Erro ao conectar com o banco de dados: {e}")
+        print(f"URL do banco: {database_url}")
+        print("Certifique-se de que o container Docker do PostgreSQL está rodando.")
         sys.exit(1)
 
     if args.list or not args.table_name:
