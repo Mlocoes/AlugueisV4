@@ -1,9 +1,7 @@
 // Relatórios JavaScript
 class RelatoriosManager {
     constructor() {
-        this.apiClient = new ApiClient();
-        this.reportChart = null;
-        this.reportTable = null;
+        this.apiClient = window.apiClient;
         this.init();
     }
 

@@ -1,7 +1,7 @@
 // Administração JavaScript
 class AdministracaoManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.usuariosTable = null;
         this.backupTable = null;
         this.currentUser = null;

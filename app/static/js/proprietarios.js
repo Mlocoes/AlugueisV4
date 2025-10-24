@@ -1,9 +1,8 @@
 // Proprietários JavaScript
 class ProprietariosManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.proprietariosTable = null;
-        this.currentProprietario = null;
         this.init();
     }
 

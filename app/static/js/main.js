@@ -218,7 +218,7 @@ class ApiClient {
 }
 
 // Global API client instance
-const api = new ApiClient();
+const api = window.apiClient;
 
 // Utility functions
 const utils = {
@@ -399,6 +399,9 @@ function createTable(headers, data, actions = []) {
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', function() {
     console.log('Sistema de Aluguéis inicializado');
+
+    // Criar instância global do ApiClient
+    window.apiClient = new ApiClient();
 
     // Mobile menu toggle
     const mobileMenuButton = document.querySelector('[aria-controls="mobile-menu"]');

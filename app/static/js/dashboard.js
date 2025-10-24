@@ -3,13 +3,8 @@ console.log('Dashboard.js carregado');
 
 class DashboardManager {
     constructor() {
-        this.apiClient = new ApiClient();
-        this.receitaChart = null;
-        this.statusImoveisChart = null;
-        this.tiposImoveisChart = null;
-        this.receitaProprietariosChart = null;
-        this.alugueisTable = null;
-        this.isCheckingAuth = false; // Flag para evitar múltiplas verificações
+        this.apiClient = window.apiClient;
+        this.charts = {};
         this.init();
     }
 

@@ -4,7 +4,7 @@
 
 class ImportManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.init();
     }
 

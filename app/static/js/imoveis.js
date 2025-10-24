@@ -1,7 +1,7 @@
 // Imóveis JavaScript
 class ImoveisManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.imoveisTable = null;
         this.currentImovel = null;
         this.init();

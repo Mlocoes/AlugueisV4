@@ -1,7 +1,7 @@
 // Login JavaScript
 class LoginManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.init();
     }
 

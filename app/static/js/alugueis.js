@@ -1,7 +1,7 @@
 // Aluguéis JavaScript
 class AlugueisManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.alugueisTable = null;
         this.currentAluguel = null;
         this.imoveis = [];

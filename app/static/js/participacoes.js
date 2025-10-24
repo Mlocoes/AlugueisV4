@@ -1,7 +1,7 @@
 // Participações JavaScript
 class ParticipacoesManager {
     constructor() {
-        this.apiClient = new ApiClient();
+        this.apiClient = window.apiClient;
         this.participacoesTable = null;
         this.currentParticipacao = null;
         this.imoveis = [];
