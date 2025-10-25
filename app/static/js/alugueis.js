@@ -402,8 +402,13 @@ class AlugueisManager {
 
         let url = '/api/alugueis/mensais/?';
         const params = [];
-        if (imovelId) params.push(`id_imovel=${imovelId}`);
-        if (mes) params.push(`data_referencia=${mes}`);
+        if (imovelId) params.push(`imovel_id=${imovelId}`);
+        if (mes) {
+            // Parse do formato YYYY-MM para ano e mes separados
+            const [ano, mesNum] = mes.split('-');
+            params.push(`ano=${ano}`);
+            params.push(`mes=${mesNum}`);
+        }
 
         url += params.join('&');
 
