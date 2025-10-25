@@ -49,39 +49,45 @@ class ImportacaoAvancadaService:
         return len(cpf) >= 11  # CPF tem 11 dígitos, CNPJ tem 14
 
     @staticmethod
-    def parse_valor_monetario(valor_str: str) -> Optional[Decimal]:
+    def parse_valor_monetario(valor_str) -> Optional[Decimal]:
         """Converte string monetária brasileira ou americana para Decimal"""
-        if not valor_str or str(valor_str).strip() in ['', '-', '']:
+        # Tratamento para None
+        if valor_str is None:
             return None
 
-        # Remove formatação brasileira (pontos como separadores de milhares, vírgula como decimal)
-        valor_str = str(valor_str).strip()
+        # Se já for numérico (int/float/Decimal), converter diretamente preservando valor
+        if isinstance(valor_str, (int, float, Decimal)):
+            try:
+                return Decimal(str(valor_str))
+            except Exception:
+                return None
 
-        # Trata valores negativos (com hífen)
+        # A partir daqui, tratar como string
+        s = str(valor_str).strip()
+        if s in ['', '-']:
+            return None
+
         negativo = False
-        if valor_str.startswith('-'):
+        if s.startswith('-'):
             negativo = True
-            valor_str = valor_str[1:].strip()
+            s = s[1:].strip()
 
         # Remove "R$", espaços e outros caracteres não numéricos exceto vírgula e ponto
-        valor_str = re.sub(r'[R$\s]', '', valor_str)
+        s = re.sub(r'[R$\s]', '', s)
 
         # Detectar formato: se tem vírgula E ponto, assumir brasileiro
-        # Se tem apenas ponto, assumir americano
         # Se tem apenas vírgula, assumir brasileiro
-        if ',' in valor_str and '.' in valor_str:
-            # Formato brasileiro: 1.234,56
-            valor_str = valor_str.replace('.', '').replace(',', '.')
-        elif ',' in valor_str and '.' not in valor_str:
-            # Apenas vírgula: 1234,56 -> brasileiro
-            valor_str = valor_str.replace(',', '.')
-        elif '.' in valor_str and ',' not in valor_str:
-            # Apenas ponto: 1234.56 -> americano, manter como está
-            pass
-        # Se não tem nenhum, é inteiro
+        # Se tem apenas ponto, assumir americano
+        if ',' in s and '.' in s:
+            # Formato brasileiro: 1.234,56 -> 1234.56
+            s = s.replace('.', '').replace(',', '.')
+        elif ',' in s and '.' not in s:
+            # Apenas vírgula: 1234,56 -> 1234.56
+            s = s.replace(',', '.')
+        # else: apenas ponto ou nenhum separador -> manter
 
         try:
-            valor = Decimal(valor_str)
+            valor = Decimal(s)
             return -valor if negativo else valor
         except (InvalidOperation, ValueError):
             return None
@@ -191,7 +197,27 @@ class ImportacaoAvancadaService:
     def importar_imoveis(self, file_content: bytes, db: Session) -> Dict[str, Any]:
         """Importa imóveis do Excel"""
         try:
-            df = pd.read_excel(BytesIO(file_content), sheet_name=0)
+            # Primeiro ler para identificar as colunas
+            df_preview = pd.read_excel(BytesIO(file_content), sheet_name=0, nrows=1)
+            colunas = df_preview.columns.tolist()
+            
+            # Criar converters para colunas monetárias - forçar leitura como string
+            converters = {}
+            colunas_monetarias = [
+                'área total', 'area total', 'total area',
+                'área construída', 'area construida', 'constructed area', 
+                'valor catastral', 'cadastral value',
+                'valor de mercado', 'valor mercado', 'market value',
+                'iptu', 'iptu anual', 'annual iptu',
+                'condomínio', 'condominio', 'hoa fee'
+            ]
+            
+            for i, col in enumerate(colunas):
+                col_padronizada = col.lower().strip()
+                if any(monetaria in col_padronizada for monetaria in colunas_monetarias):
+                    converters[col] = str  # Forçar leitura como string para preservar formato
+            
+            df = pd.read_excel(BytesIO(file_content), sheet_name=0, converters=converters)
 
             # Mapeamento flexível de colunas
             mapeamento = self.mapear_colunas_imoveis(df.columns.tolist())
@@ -502,7 +528,20 @@ class ImportacaoAvancadaService:
 
             for sheet_name in xl.sheet_names:
                 try:
-                    df = pd.read_excel(xl, sheet_name=sheet_name, header=None)
+                    # Primeiro, ler apenas para determinar o número de colunas
+                    df_preview = pd.read_excel(xl, sheet_name=sheet_name, header=None, nrows=5)
+                    num_cols = len(df_preview.columns)
+
+                    # Usar converters para forçar leitura como string das colunas monetárias
+                    # Isso previne que pandas converta automaticamente valores como "49.891,92" para float
+                    converters = {}
+                    for i in range(num_cols):
+                        if i == 0:
+                            converters[i] = str  # Nome do imóvel
+                        else:
+                            converters[i] = str  # Valores monetários - preservar formato original
+
+                    df = pd.read_excel(xl, sheet_name=sheet_name, header=None, converters=converters)
                     
                     # Verificar se há dados suficientes
                     if df.empty or len(df) < 2:
