@@ -7,11 +7,17 @@ class AlugueisManager {
             this.alugueisTable = null;
             this.init();
         } else {
-            window.addEventListener('apiReady', (event) => {
-                this.apiClient = event.detail;
-                this.alugueisTable = null;
-                this.init();
-            });
+            // Aguardar o evento apiReady ou verificar periodicamente
+            const checkApiReady = () => {
+                if (window.apiClient) {
+                    this.apiClient = window.apiClient;
+                    this.alugueisTable = null;
+                    this.init();
+                } else {
+                    setTimeout(checkApiReady, 100);
+                }
+            };
+            checkApiReady();
         }
     }
 
@@ -372,7 +378,10 @@ class AlugueisManager {
                 
                 // Aplicar filtros salvos
                 if (filters.imovel || filters.mes) {
-                    this.searchAlugueis();
+                    // Aguardar um pouco para garantir que os dados foram carregados
+                    setTimeout(() => {
+                        this.searchAlugueis();
+                    }, 100);
                 }
             } catch (error) {
                 console.error('Erro ao carregar filtros salvos:', error);
@@ -381,18 +390,25 @@ class AlugueisManager {
     }
 
     async searchAlugueis() {
+        // Garantir que a tabela esteja inicializada
+        if (!this.alugueisTable) {
+            console.log('Tabela não inicializada, carregando dados primeiro...');
+            await this.loadAlugueis();
+            return;
+        }
+
         const imovelId = document.getElementById('filter-imovel').value;
         const mes = document.getElementById('filter-mes').value;
 
-        let url = '/alugueis?';
+        let url = '/api/alugueis/mensais/?';
         const params = [];
-        if (imovelId) params.push(`imovel_id=${imovelId}`);
-        if (mes) params.push(`mes_referencia=${mes}`);
+        if (imovelId) params.push(`id_imovel=${imovelId}`);
+        if (mes) params.push(`data_referencia=${mes}`);
 
         url += params.join('&');
 
         try {
-            const alugueis = await this.apiClient.get(url.replace('/alugueis', '/api/alugueis'));
+            const alugueis = await this.apiClient.get(url);
             this.updateTable(alugueis);
         } catch (error) {
             console.error('Erro ao buscar aluguéis:', error);
@@ -400,18 +416,24 @@ class AlugueisManager {
     }
 
     updateTable(alugueis) {
+        if (!this.alugueisTable) {
+            console.error('Tabela não inicializada. Tentando inicializar...');
+            return;
+        }
+
         const data = alugueis.map(aluguel => {
-            const imovel = this.imoveis.find(i => i.id === aluguel.imovel_id);
+            const imovel = this.imoveis.find(i => i.id === aluguel.id_imovel);
+            const proprietario = this.proprietarios.find(p => p.id === aluguel.id_proprietario);
 
             return [
                 aluguel.id,
-                imovel ? `${imovel.endereco} - ${imovel.cidade}` : 'N/A',
-                aluguel.inquilino_nome,
-                `R$ ${aluguel.valor_aluguel.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                aluguel.dia_vencimento,
-                new Date(aluguel.data_inicio).toLocaleDateString('pt-BR'),
-                aluguel.data_fim ? new Date(aluguel.data_fim).toLocaleDateString('pt-BR') : 'N/A',
-                'Editar | Excluir'
+                imovel ? `${imovel.endereco}` : 'N/A',
+                proprietario ? proprietario.nome : `Proprietário ${aluguel.id_proprietario}`,
+                aluguel.data_referencia,
+                aluguel.valor_total,
+                aluguel.valor_proprietario,
+                aluguel.taxa_administracao,
+                'Ações'
             ];
         });
 
