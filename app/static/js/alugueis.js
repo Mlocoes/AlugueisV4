@@ -74,8 +74,14 @@ class AlugueisManager {
         // Event listeners para filtros
         document.getElementById('clear-filters-btn').addEventListener('click', () => this.clearFilters());
         this.loadSavedFilters();
-        document.getElementById('filter-imovel').addEventListener('change', () => this.saveFilters());
-        document.getElementById('filter-mes').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-imovel').addEventListener('change', () => {
+            this.saveFilters();
+            this.searchAlugueis();
+        });
+        document.getElementById('filter-mes').addEventListener('change', () => {
+            this.saveFilters();
+            this.searchAlugueis();
+        });
     }
 
     async logout() {
