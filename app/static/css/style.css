@@ -104,7 +104,9 @@
 }
 
 .card-header {
-    @apply border-b border-gray-200 pb-4 mb-4;
+    border-bottom: 1px solid #e5e7eb;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
 }
 
 /* Loading spinner */
