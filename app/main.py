@@ -19,7 +19,7 @@ app = FastAPI(
 # Configurar CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Em produção, especifique os domínios permitidos
+    allow_origins=settings.allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -84,12 +84,14 @@ async def importacao_page(request: Request):
 async def administracao_page(request: Request):
     return templates.TemplateResponse("administracao.html", {"request": request})
 
+import os
+
 # Rotas para download de modelos Excel
 @app.get("/Proprietarios.xlsx")
 async def download_proprietarios_model():
     """Serve o arquivo modelo Excel para proprietários"""
     return FileResponse(
-        path="/app/Proprietarios.xlsx",
+        path=os.path.join(os.path.dirname(__file__), "..", "Proprietarios.xlsx"),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         filename="Modelo_Proprietarios.xlsx"
     )
@@ -98,7 +100,7 @@ async def download_proprietarios_model():
 async def download_imoveis_model():
     """Serve o arquivo modelo Excel para imóveis"""
     return FileResponse(
-        path="/app/Imoveis.xlsx",
+        path=os.path.join(os.path.dirname(__file__), "..", "Imoveis.xlsx"),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         filename="Modelo_Imoveis.xlsx"
     )
@@ -107,7 +109,7 @@ async def download_imoveis_model():
 async def download_alugueis_model():
     """Serve o arquivo modelo Excel para aluguéis"""
     return FileResponse(
-        path="/app/Alugueis.xlsx",
+        path=os.path.join(os.path.dirname(__file__), "..", "Alugueis.xlsx"),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         filename="Modelo_Alugueis.xlsx"
     )
@@ -116,7 +118,7 @@ async def download_alugueis_model():
 async def download_participacoes_model():
     """Serve o arquivo modelo Excel para participações"""
     return FileResponse(
-        path="/app/Participacoes.xlsx",
+        path=os.path.join(os.path.dirname(__file__), "..", "Participacoes.xlsx"),
         media_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         filename="Modelo_Participacoes.xlsx"
     )

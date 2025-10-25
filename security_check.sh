@@ -13,7 +13,7 @@ if [[ $EUID -eq 0 ]]; then
 fi
 
 # Verificar permissões do banco de dados
-DB_FILE="/home/mloco/Escritorio/AlugueisV4/alugueis.db"
+DB_FILE="alugueis.db"
 if [[ -f "$DB_FILE" ]]; then
     DB_OWNER=$(stat -c '%U' "$DB_FILE")
     DB_PERMS=$(stat -c '%a' "$DB_FILE")
@@ -32,9 +32,9 @@ fi
 
 # Verificar arquivos de configuração sensíveis
 SENSITIVE_FILES=(
-    "/home/mloco/Escritorio/AlugueisV4/app/core/config.py"
-    "/home/mloco/Escritorio/AlugueisV4/.env"
-    "/home/mloco/Escritorio/AlugueisV4/server.log"
+    "app/core/config.py"
+    ".env"
+    "server.log"
 )
 
 for file in "${SENSITIVE_FILES[@]}"; do
