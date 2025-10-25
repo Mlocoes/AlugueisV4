@@ -6,14 +6,12 @@ class ImoveisManager {
             this.apiClient = window.apiClient;
             this.imoveisTable = null;
             this.currentImovel = null;
-            this.saveTimer = null; // Timer para salvamento automático
             this.init();
         } else {
             window.addEventListener('apiReady', (event) => {
                 this.apiClient = event.detail;
                 this.imoveisTable = null;
                 this.currentImovel = null;
-                this.saveTimer = null; // Timer para salvamento automático
                 this.init();
             });
         }
@@ -174,15 +172,10 @@ class ImoveisManager {
                 licenseKey: 'non-commercial-and-evaluation',
                 afterChange: (changes, source) => {
                     if (source === 'edit' && isAdmin && changes) {
-                        // Limpar timer anterior se existir
-                        if (this.saveTimer) {
-                            clearTimeout(this.saveTimer);
-                        }
-                        
-                        // Aguardar 500ms antes de salvar (permite edição rápida)
-                        this.saveTimer = setTimeout(() => {
+                        // Pequeno delay para permitir edição rápida sem salvar intermediário
+                        setTimeout(() => {
                             this.handleCellChange(changes);
-                        }, 500);
+                        }, 300);
                     }
                 },
                 cells: function(row, col) {
@@ -317,36 +310,44 @@ class ImoveisManager {
     }
 
     validateField(fieldName, value) {
+        // Verificar se o valor é válido
+        if (value === null || value === undefined) {
+            return 'Valor não pode ser vazio.';
+        }
+        
+        // Converter para string e trim para validação
+        const strValue = String(value).trim();
+        
         switch (fieldName) {
             case 'nome':
-                if (!value || value.trim() === '') {
+                if (strValue === '') {
                     return 'Nome do imóvel é obrigatório.';
                 }
-                if (value.length > 120) {
+                if (strValue.length > 120) {
                     return 'Nome do imóvel deve ter no máximo 120 caracteres.';
                 }
                 break;
                 
             case 'tipo':
-                if (!value || !['Comercial', 'Residencial'].includes(value)) {
+                if (!strValue || !['Comercial', 'Residencial'].includes(strValue)) {
                     return 'Tipo deve ser "Comercial" ou "Residencial".';
                 }
                 break;
                 
             case 'endereco':
-                if (!value || value.trim() === '') {
+                if (strValue === '') {
                     return 'Endereço do imóvel é obrigatório.';
                 }
                 break;
                 
             case 'alugado':
-                if (!value || !['disponivel', 'alugado'].includes(value)) {
+                if (!strValue || !['disponivel', 'alugado'].includes(strValue)) {
                     return 'Status deve ser "disponivel" ou "alugado".';
                 }
                 break;
                 
             case 'valor_mercado':
-                const numValue = parseFloat(value);
+                const numValue = parseFloat(strValue);
                 if (isNaN(numValue) || numValue < 0) {
                     return 'Valor de mercado deve ser um número positivo.';
                 }
