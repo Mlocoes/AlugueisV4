@@ -2,7 +2,6 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
-from passlib.exc import UnknownHashError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -23,11 +22,9 @@ def verify_password(plain_password, hashed_password):
         return False
     try:
         return pwd_context.verify(plain_password, hashed_password)
-    except UnknownHashError:
-        # Hash com formato desconhecido — não autentica, mas evita erro de servidor
-        return False
-    except Exception:
-        # Qualquer outro erro — falhar de forma segura
+    except Exception as e:
+        # Qualquer erro na verificação (incluindo UnknownHashError) — falhar de forma segura
+        print(f"Aviso: Erro na verificação de senha: {e}")
         return False
 
 def get_password_hash(password):
