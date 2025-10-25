@@ -86,11 +86,16 @@ def get_dashboard_charts(db: Session = Depends(get_db), current_user: Usuario = 
         ano = mes_referencia.year
         mes = mes_referencia.month
         
-        # Calcular receita total do mês
-        receita_mes = db.query(func.sum(AluguelMensal.valor_total)).filter(
+        # Calcular receita total do mês (valores únicos por imóvel)
+        subquery_mes = db.query(
+            AluguelMensal.id_imovel,
+            func.max(AluguelMensal.valor_total).label('valor_total_unico')
+        ).filter(
             extract('year', AluguelMensal.data_referencia) == ano,
             extract('month', AluguelMensal.data_referencia) == mes
-        ).scalar() or 0
+        ).group_by(AluguelMensal.id_imovel).subquery()
+        
+        receita_mes = db.query(func.sum(subquery_mes.c.valor_total_unico)).scalar() or 0
         
         receita_por_mes.append({
             "mes": f"{mes:02d}/{ano}",
