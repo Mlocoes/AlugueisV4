@@ -34,7 +34,7 @@ class ParticipacoesManager {
                 // Tentar login com credenciais de teste
                 const formData = new FormData();
                 formData.append('username', 'admin');
-                formData.append('password', '123');
+                formData.append('password', 'admin00');
 
                 const response = await fetch('/auth/login', {
                     method: 'POST',
@@ -82,11 +82,14 @@ class ParticipacoesManager {
     }
 
     async loadData() {
+        // Carregar dependências primeiro
         await Promise.all([
             this.loadImoveis(),
-            this.loadProprietarios(),
-            this.loadParticipacoes()
+            this.loadProprietarios()
         ]);
+        
+        // Depois carregar participações (que depende dos dados acima)
+        await this.loadParticipacoes();
     }
 
     async loadImoveis() {
