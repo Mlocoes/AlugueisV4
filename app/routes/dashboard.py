@@ -27,12 +27,14 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     hoje = datetime.now()
     
     # Subquery para obter valor_total único por imóvel no mês
+    # Usar uma lógica mais robusta: pegar o valor mais recente ou o maior valor positivo
     subquery = db.query(
         AluguelMensal.id_imovel,
         func.max(AluguelMensal.valor_total).label('valor_total_unico')
     ).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
         extract('month', AluguelMensal.data_referencia) == hoje.month
+        # Removido filtro de valores positivos para incluir todos os valores na receita total
     ).group_by(AluguelMensal.id_imovel).subquery()
     
     receita_mensal = db.query(func.sum(subquery.c.valor_total_unico)).scalar() or 0
@@ -93,6 +95,7 @@ def get_dashboard_charts(db: Session = Depends(get_db), current_user: Usuario = 
         ).filter(
             extract('year', AluguelMensal.data_referencia) == ano,
             extract('month', AluguelMensal.data_referencia) == mes
+            # Removido filtro de valores positivos para incluir todos os valores na receita total
         ).group_by(AluguelMensal.id_imovel).subquery()
         
         receita_mes = db.query(func.sum(subquery_mes.c.valor_total_unico)).scalar() or 0
