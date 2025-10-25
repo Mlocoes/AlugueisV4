@@ -569,24 +569,18 @@ class ImportacaoAvancadaService:
                     except ValueError as e:
                         erros.append(f"Planilha '{sheet_name}': Data inválida '{data_ref_str}' - {str(e)}")
                         continue
+
+                    # Os cabeçalhos estão na linha 0, colunas 1 em diante
+                    headers = df.iloc[0, 1:]  # Pular a coluna da data
                     
-                    # Pular a primeira linha (data) e usar as linhas seguintes como dados
-                    df = df[1:]  # Remover linha da data
-                    
-                    # Remover linhas vazias
-                    df = df.dropna(how='all')
-                    
-                    if df.empty:
-                        continue
-                    
-                    # Neste formato específico, não há cabeçalhos
-                    # A primeira linha já contém dados (imóvel, valor total, valores por proprietário, taxa)
-                    df_data = df[1:]  # Pular apenas a linha da data
+                    # Pular a linha dos cabeçalhos para os dados
+                    df_data = df[1:]
                     
                     # Remover linhas vazias
                     df_data = df_data.dropna(how='all')
                     
                     if df_data.empty:
+                        erros.append(f"Planilha '{sheet_name}': Dados insuficientes")
                         continue
                     
                     # Verificar se a primeira linha de dados tem a estrutura esperada
@@ -598,66 +592,85 @@ class ImportacaoAvancadaService:
                     # A estrutura esperada é:
                     # Coluna 0: Nome do imóvel
                     # Coluna 1: Valor Total
-                    # Colunas 2 até penúltima: Valores por proprietário (sem nomes específicos)
+                    # Colunas 2 até penúltima: Valores por proprietário (com nomes específicos)
                     # Última coluna: Taxa de Administração
                     
-                    num_cols = len(df_data.columns)
-                    if num_cols < 3:
-                        erros.append(f"Planilha '{sheet_name}': Formato inválido - poucas colunas")
-                        continue
+                    # Definir índices das colunas (ajustados pois headers começa da coluna 1)
+                    imovel_col = 0  # Sempre a primeira coluna dos dados
+                    valor_total_col = 1  # Sempre a segunda coluna dos dados
+                    taxa_admin_col = len(df_data.columns) - 1  # Última coluna dos dados
                     
-                    # Definir índices das colunas
-                    imovel_col = 0
-                    valor_total_col = 1
-                    taxa_admin_col = num_cols - 1
-                    
-                    # Neste caso, não temos nomes de proprietários específicos
-                    # Vamos assumir uma ordem baseada na posição
+                    # Colunas dos proprietários são da 3ª até a penúltima dos dados
+                    # Mas mapeiam para os cabeçalhos (que começam do índice 0 dos headers)
                     proprietario_cols = []
-                    for i in range(2, num_cols - 1):  # Do 3º até o penúltimo
-                        proprietario_cols.append((i, f'Proprietario_{i-1}'))
+                    for i in range(2, len(df_data.columns) - 1):
+                        header_idx = i - 1  # Headers começa do índice 0
+                        if header_idx < len(headers):
+                            nome_proprietario = str(headers.iloc[header_idx]).strip()
+                            if nome_proprietario and nome_proprietario.lower() not in ['nan', 'none', '']:
+                                proprietario_cols.append((i, nome_proprietario))
                     
-                    # Buscar proprietários reais do sistema na ordem dos valores
-                    from app.models.usuario import Usuario
-                    proprietarios_reais = db.query(Usuario).filter(
-                        Usuario.tipo.in_(['usuario', 'proprietario'])
-                    ).order_by(Usuario.id).limit(len(proprietario_cols)).all()
+                    # Mapear proprietários pelos nomes das colunas do Excel
+                    proprietarios_mapeados = []
+                    for col_idx, nome_excel in proprietario_cols:
+                        # Buscar proprietário por nome (case insensitive, partial match)
+                        proprietario = None
+                        for tipo in ['usuario', 'proprietario']:
+                            proprietario = db.query(Usuario).filter(
+                                Usuario.tipo == tipo,
+                                Usuario.nome.ilike(f'%{nome_excel}%')
+                            ).first()
+                            if proprietario:
+                                break
+                        
+                        if not proprietario:
+                            # Tentar buscar por nome completo (nome + sobrenome)
+                            partes_nome = nome_excel.split()
+                            if len(partes_nome) >= 2:
+                                proprietario = db.query(Usuario).filter(
+                                    Usuario.tipo.in_(['usuario', 'proprietario']),
+                                    Usuario.nome.ilike(f'%{partes_nome[0]}%'),
+                                    Usuario.sobrenome.ilike(f'%{partes_nome[1]}%')
+                                ).first()
+                        
+                        if proprietario:
+                            proprietarios_mapeados.append((col_idx, proprietario))
+                        else:
+                            erros.append(f"Planilha '{sheet_name}': Proprietário '{nome_excel}' não encontrado")
                     
-                    if len(proprietarios_reais) < len(proprietario_cols):
-                        erros.append(f"Planilha '{sheet_name}': Não há proprietários suficientes cadastrados ({len(proprietarios_reais)} encontrados, {len(proprietario_cols)} necessários)")
+                    if not proprietarios_mapeados:
+                        erros.append(f"Planilha '{sheet_name}': Nenhum proprietário mapeado")
                         continue
-                    
-                    # Mapear colunas para proprietários reais
-                    proprietario_cols = [(i, prop.nome) for i, prop in zip(range(2, num_cols - 1), proprietarios_reais)]
-                    
+
                     # Processar cada linha (imóvel)
                     for idx, row in df_data.iterrows():
                         try:
-                            imovel_nome = str(row.iloc[0]).strip()
+                            imovel_nome = str(row.iloc[imovel_col]).strip()
                             if not imovel_nome or imovel_nome.lower() in ['nan', 'none', '']:
                                 continue
                             
                             # Buscar imóvel por nome
-                            from app.models.imovel import Imovel
                             imovel = db.query(Imovel).filter(Imovel.nome.ilike(f'%{imovel_nome}%')).first()
                             if not imovel:
                                 # Tentar buscar por endereço também
                                 imovel = db.query(Imovel).filter(Imovel.endereco.ilike(f'%{imovel_nome}%')).first()
                             if not imovel:
-                                erros.append(f"Linha {idx+2} planilha '{sheet_name}': Imóvel '{imovel_nome}' não encontrado")
+                                erros.append(f"Linha {idx+3} planilha '{sheet_name}': Imóvel '{imovel_nome}' não encontrado")
                                 continue
                             
                             # Valor total do aluguel
-                            valor_total = self.parse_valor_monetario(str(row.iloc[valor_total_col]))
+                            valor_total_str = str(row.iloc[valor_total_col]).strip()
+                            valor_total = self.parse_valor_monetario(valor_total_str)
                             if valor_total is None:
-                                erros.append(f"Linha {idx+2} planilha '{sheet_name}': Valor total inválido")
+                                erros.append(f"Linha {idx+3} planilha '{sheet_name}': Valor total inválido '{valor_total_str}'")
                                 continue
                             
                             # Taxa de administração (opcional)
-                            taxa_admin = self.parse_valor_monetario(str(row.iloc[taxa_admin_col])) or Decimal('0')
+                            taxa_admin_str = str(row.iloc[taxa_admin_col]).strip()
+                            taxa_admin = self.parse_valor_monetario(taxa_admin_str) or Decimal('0')
                             
-                            # Processar valores por proprietário
-                            for col_idx, prop_nome in proprietario_cols:
+                            # Processar valores por proprietário mapeado
+                            for col_idx, proprietario in proprietarios_mapeados:
                                 valor_prop_str = str(row.iloc[col_idx]).strip()
                                 if valor_prop_str.lower() in ['nan', 'none', '']:
                                     continue
@@ -665,16 +678,6 @@ class ImportacaoAvancadaService:
                                 # Limpar valor
                                 valor_proprietario = self.parse_valor_monetario(valor_prop_str)
                                 if valor_proprietario is None:
-                                    continue
-                                
-                                # Buscar proprietário
-                                from app.models.usuario import Usuario
-                                proprietario = db.query(Usuario).filter(
-                                    Usuario.nome.ilike(f'%{prop_nome}%')
-                                ).first()
-                                
-                                if not proprietario:
-                                    erros.append(f"Linha {idx+2} planilha '{sheet_name}': Proprietário '{prop_nome}' não encontrado")
                                     continue
                                 
                                 # Verificar se já existe registro para este mês/proprietário/imóvel
@@ -705,7 +708,7 @@ class ImportacaoAvancadaService:
                                 registros_importados += 1
                         
                         except Exception as e:
-                            erros.append(f"Linha {idx+2} planilha '{sheet_name}': Erro ao processar - {str(e)}")
+                            erros.append(f"Linha {idx+3} planilha '{sheet_name}': Erro ao processar - {str(e)}")
                 
                 except Exception as e:
                     erros.append(f"Planilha '{sheet_name}': Erro geral - {str(e)}")
