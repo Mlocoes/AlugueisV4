@@ -2,7 +2,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_active_user, get_current_admin_user
+from app.core.permissions import filter_inactive_records
 from app.schemas import Usuario, UsuarioCreate, UsuarioUpdate
 from app.models.usuario import Usuario as UsuarioModel
 from app.core.auth import get_password_hash
@@ -14,9 +15,13 @@ def read_usuarios(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_active_user)
+    current_user: Usuario = Depends(get_current_admin_user)  # Só admin pode listar usuários
 ):
-    usuarios = db.query(UsuarioModel).offset(skip).limit(limit).all()
+    # Aplicar filtros de permissão
+    query = db.query(UsuarioModel)
+    query = filter_inactive_records(query, current_user)
+    
+    usuarios = query.offset(skip).limit(limit).all()
     
     # Conversão manual para evitar problemas de tipos
     result = []
@@ -42,7 +47,7 @@ def read_usuarios(
 def create_usuario(
     usuario: UsuarioCreate,
     db: Session = Depends(get_db),
-    current_user: UsuarioModel = Depends(get_current_active_user)
+    current_user: UsuarioModel = Depends(get_current_admin_user)
 ):
     # Verificar se email já existe
     db_usuario = db.query(UsuarioModel).filter(UsuarioModel.email == usuario.email).first()
@@ -121,7 +126,7 @@ def update_usuario(
     usuario_id: int,
     usuario_update: UsuarioUpdate,
     db: Session = Depends(get_db),
-    current_user: UsuarioModel = Depends(get_current_active_user)
+    current_user: UsuarioModel = Depends(get_current_admin_user)
 ):
     db_usuario = db.query(UsuarioModel).filter(UsuarioModel.id == usuario_id).first()
     if db_usuario is None:
@@ -153,7 +158,7 @@ def update_usuario(
 def delete_usuario(
     usuario_id: int,
     db: Session = Depends(get_db),
-    current_user: UsuarioModel = Depends(get_current_active_user)
+    current_user: UsuarioModel = Depends(get_current_admin_user)
 ):
     db_usuario = db.query(UsuarioModel).filter(UsuarioModel.id == usuario_id).first()
     if db_usuario is None:

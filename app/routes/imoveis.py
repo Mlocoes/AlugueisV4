@@ -2,7 +2,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_active_user, get_current_admin_user
+from app.core.permissions import filter_inactive_records
 from app.schemas import Imovel, ImovelCreate, ImovelUpdate
 from app.models.imovel import Imovel as ImovelModel
 from app.models.usuario import Usuario
@@ -17,7 +18,11 @@ def read_imoveis(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
-    imoveis = db.query(ImovelModel).offset(skip).limit(limit).all()
+    # Aplicar filtros de permissão
+    query = db.query(ImovelModel)
+    query = filter_inactive_records(query, current_user)
+    
+    imoveis = query.offset(skip).limit(limit).all()
     
     # Converter com máxima segurança
     result = []
@@ -69,7 +74,7 @@ def read_imoveis(
 def create_imovel(
     imovel: ImovelCreate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_active_user)
+    current_user: Usuario = Depends(get_current_admin_user)
 ):
     db_imovel = ImovelModel(**imovel.dict())
     db.add(db_imovel)
@@ -93,7 +98,7 @@ def update_imovel(
     imovel_id: int,
     imovel_update: ImovelUpdate,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_active_user)
+    current_user: Usuario = Depends(get_current_admin_user)
 ):
     db_imovel = db.query(ImovelModel).filter(ImovelModel.id == imovel_id).first()
     if db_imovel is None:
@@ -168,7 +173,7 @@ def update_imovel(
 def delete_imovel(
     imovel_id: int,
     db: Session = Depends(get_db),
-    current_user: Usuario = Depends(get_current_active_user)
+    current_user: Usuario = Depends(get_current_admin_user)
 ):
     db_imovel = db.query(ImovelModel).filter(ImovelModel.id == imovel_id).first()
     if db_imovel is None:

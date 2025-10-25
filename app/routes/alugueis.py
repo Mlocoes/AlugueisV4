@@ -2,7 +2,8 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_active_user, get_current_admin_user
+from app.core.permissions import filter_by_permissions, can_edit_financial_data, filter_inactive_records
 from app.schemas import Aluguel, AluguelCreate, AluguelUpdate, AluguelMensal, AluguelMensalCreate, AluguelMensalUpdate
 from app.models.aluguel import Aluguel as AluguelModel, AluguelMensal as AluguelMensalModel
 from app.models.usuario import Usuario
@@ -17,7 +18,11 @@ def read_alugueis(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
-    alugueis = db.query(AluguelModel).offset(skip).limit(limit).all()
+    # Aplicar filtros de permissão financeira
+    query = db.query(AluguelModel)
+    query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    alugueis = query.offset(skip).limit(limit).all()
     return alugueis
 
 @router.post("/", response_model=Aluguel)
@@ -26,6 +31,13 @@ def create_aluguel(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
+    # Verificar permissões para editar dados do proprietário
+    if not can_edit_financial_data(current_user, aluguel.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para criar aluguéis para este proprietário"
+        )
+    
     db_aluguel = AluguelModel(**aluguel.dict())
     db.add(db_aluguel)
     db.commit()
@@ -41,6 +53,14 @@ def read_aluguel(
     db_aluguel = db.query(AluguelModel).filter(AluguelModel.id == aluguel_id).first()
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel not found")
+    
+    # Verificar se usuário tem permissão para ver este aluguel
+    if not can_edit_financial_data(current_user, db_aluguel.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar este aluguel"
+        )
+    
     return db_aluguel
 
 @router.put("/{aluguel_id}", response_model=Aluguel)
@@ -53,6 +73,13 @@ def update_aluguel(
     db_aluguel = db.query(AluguelModel).filter(AluguelModel.id == aluguel_id).first()
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel not found")
+    
+    # Verificar permissões para editar dados do proprietário
+    if not can_edit_financial_data(current_user, db_aluguel.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para editar este aluguel"
+        )
     
     update_data = aluguel_update.dict(exclude_unset=True)
     for field, value in update_data.items():
@@ -71,6 +98,13 @@ def delete_aluguel(
     db_aluguel = db.query(AluguelModel).filter(AluguelModel.id == aluguel_id).first()
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel not found")
+    
+    # Verificar permissões para excluir dados do proprietário
+    if not can_edit_financial_data(current_user, db_aluguel.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para excluir este aluguel"
+        )
     
     db.delete(db_aluguel)
     db.commit()

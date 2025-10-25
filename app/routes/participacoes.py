@@ -2,7 +2,8 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.core.database import get_db
-from app.core.auth import get_current_active_user
+from app.core.auth import get_current_active_user, get_current_admin_user
+from app.core.permissions import filter_by_permissions, can_edit_financial_data
 from app.schemas import Participacao, ParticipacaoCreate, ParticipacaoUpdate
 from app.models.participacao import Participacao as ParticipacaoModel
 from app.models.usuario import Usuario
@@ -17,7 +18,11 @@ def read_participacoes(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
-    participacoes = db.query(ParticipacaoModel).offset(skip).limit(limit).all()
+    # Aplicar filtros de permissão financeira
+    query = db.query(ParticipacaoModel)
+    query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    participacoes = query.offset(skip).limit(limit).all()
     return participacoes
 
 @router.post("/", response_model=Participacao)
@@ -26,6 +31,13 @@ def create_participacao(
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
+    # Verificar permissões para editar dados do proprietário
+    if not can_edit_financial_data(current_user, participacao.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para criar participações para este proprietário"
+        )
+    
     # Verificar se já existe participação para este imóvel e proprietário na mesma data
     existing = db.query(ParticipacaoModel).filter(
         ParticipacaoModel.id_imovel == participacao.id_imovel,
@@ -59,6 +71,14 @@ def read_participacao(
     db_participacao = db.query(ParticipacaoModel).filter(ParticipacaoModel.id == participacao_id).first()
     if db_participacao is None:
         raise HTTPException(status_code=404, detail="Participacao not found")
+    
+    # Verificar se usuário tem permissão para ver esta participação
+    if not can_edit_financial_data(current_user, db_participacao.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para acessar esta participação"
+        )
+    
     return db_participacao
 
 @router.put("/{participacao_id}", response_model=Participacao)
@@ -71,6 +91,13 @@ def update_participacao(
     db_participacao = db.query(ParticipacaoModel).filter(ParticipacaoModel.id == participacao_id).first()
     if db_participacao is None:
         raise HTTPException(status_code=404, detail="Participacao not found")
+    
+    # Verificar permissões para editar dados do proprietário
+    if not can_edit_financial_data(current_user, db_participacao.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para editar esta participação"
+        )
     
     # Se estiver atualizando a participação, validar soma
     if participacao_update.participacao is not None:
@@ -99,6 +126,13 @@ def delete_participacao(
     db_participacao = db.query(ParticipacaoModel).filter(ParticipacaoModel.id == participacao_id).first()
     if db_participacao is None:
         raise HTTPException(status_code=404, detail="Participacao not found")
+    
+    # Verificar permissões para excluir dados do proprietário
+    if not can_edit_financial_data(current_user, db_participacao.id_proprietario, db):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Você não tem permissão para excluir esta participação"
+        )
     
     db.delete(db_participacao)
     db.commit()

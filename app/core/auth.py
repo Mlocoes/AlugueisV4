@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
+from passlib.exc import UnknownHashError
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
@@ -13,7 +14,21 @@ pwd_context = CryptContext(schemes=["pbkdf2_sha256"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="auth/login")
 
 def verify_password(plain_password, hashed_password):
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verifica a senha com tratamento de hashes desconhecidos.
+
+    Retorna False em vez de lançar se o hash não for identificado pelo passlib,
+    evitando erros 500 quando existirem valores antigos ou inválidos no banco.
+    """
+    if not hashed_password:
+        return False
+    try:
+        return pwd_context.verify(plain_password, hashed_password)
+    except UnknownHashError:
+        # Hash com formato desconhecido — não autentica, mas evita erro de servidor
+        return False
+    except Exception:
+        # Qualquer outro erro — falhar de forma segura
+        return False
 
 def get_password_hash(password):
     return pwd_context.hash(password)
@@ -80,3 +95,8 @@ def refresh_access_token(token: str):
         pass
     
     return None
+
+def get_current_admin_user(current_user: Usuario = Depends(get_current_active_user)):
+    """Verifica se o usuário atual é administrador"""
+    from app.core.permissions import require_admin
+    return require_admin(current_user)
