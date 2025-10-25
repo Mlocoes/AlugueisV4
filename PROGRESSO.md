@@ -239,25 +239,28 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 
 ### ✅ Versão 1.2.2 - Correção Urgente: Erro 500 no PUT de Imóveis (CONCLUÍDO)
 
-### Versão 1.3 - Edição Inline e Filtros Avançados (PRÓXIMO)
+### Versão 1.3 - Edição Inline e Filtros Avançados (EM DESENVOLVIMENTO)
 
 #### Edição Inline com Handsontable
 - ✅ Permitir edição direta nas células da tabela (depende da correção acima) - **CONCLUÍDO**
-- [ ] Validação inline de dados
-- [ ] Destaque visual de células editadas
-- [ ] Salvar automaticamente ao sair da célula
+- ✅ Validação inline de dados - **IMPLEMENTADO**
+- ✅ Destaque visual de células editadas - **IMPLEMENTADO**
+- ✅ Salvar automaticamente ao sair da célula - **IMPLEMENTADO**
 
 #### Filtros Avançados
-- [ ] Filtros múltiplos simultâneos
-- [ ] Salvamento de filtros favoritos
+- ✅ Filtros múltiplos simultâneos - **IMPLEMENTADO**
+- [ ] Salvamento de filtros favoritos - **IMPLEMENTADO**
 - [ ] Exportação de dados filtrados
 - [ ] Ordenação avançada
 
-#### Import/Export Excel
-- [ ] Importação de planilhas Excel
-- [ ] Validação de dados importados
-- [ ] Exportação para Excel com formatação
-- [ ] Templates de importação
+#### Funcionalidades Implementadas:
+- **Validação Inline:** Verificação de campos obrigatórios, tipos válidos, limites de valores
+- **Feedback Visual:** Células ficam verdes/vermelhas com indicadores ✓/✗ durante salvamento
+- **Salvamento Automático:** Delay de 500ms após sair da célula
+- **Filtros Avançados:** Endereço, tipo, status, valor mínimo/máximo
+- **Busca Combinada:** Pesquisa por endereço E nome simultaneamente
+- **Contador de Resultados:** Mostra quantos imóveis foram encontrados
+- **Persistência de Filtros:** Filtros salvos no localStorage
 
 ### Versão 1.4 - Dashboard Interativo (FUTURO)
 
@@ -289,4 +292,3 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 - [ ] Backup diário do banco de dados
 - [ ] Restauração de backups
 - [ ] Versionamento de backups
-````

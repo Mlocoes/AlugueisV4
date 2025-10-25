@@ -6,12 +6,14 @@ class ImoveisManager {
             this.apiClient = window.apiClient;
             this.imoveisTable = null;
             this.currentImovel = null;
+            this.saveTimer = null; // Timer para salvamento automático
             this.init();
         } else {
             window.addEventListener('apiReady', (event) => {
                 this.apiClient = event.detail;
                 this.imoveisTable = null;
                 this.currentImovel = null;
+                this.saveTimer = null; // Timer para salvamento automático
                 this.init();
             });
         }
@@ -75,6 +77,8 @@ class ImoveisManager {
         document.getElementById('search-endereco').addEventListener('change', () => this.saveFilters());
         document.getElementById('filter-tipo').addEventListener('change', () => this.saveFilters());
         document.getElementById('filter-status').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-valor-min').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-valor-max').addEventListener('change', () => this.saveFilters());
     }
 
     async logout() {
@@ -170,10 +174,15 @@ class ImoveisManager {
                 licenseKey: 'non-commercial-and-evaluation',
                 afterChange: (changes, source) => {
                     if (source === 'edit' && isAdmin && changes) {
-                        // Chamar assincronamente sem bloquear o Handsontable
-                        setTimeout(() => {
+                        // Limpar timer anterior se existir
+                        if (this.saveTimer) {
+                            clearTimeout(this.saveTimer);
+                        }
+                        
+                        // Aguardar 500ms antes de salvar (permite edição rápida)
+                        this.saveTimer = setTimeout(() => {
                             this.handleCellChange(changes);
-                        }, 0);
+                        }, 500);
                     }
                 },
                 cells: function(row, col) {
@@ -213,6 +222,24 @@ class ImoveisManager {
             const fieldName = columnMap[col];
             if (!fieldName) continue;
 
+            // VALIDAR DADOS ANTES DE ENVIAR
+            const validationError = this.validateField(fieldName, newValue);
+            if (validationError) {
+                // Feedback visual: célula vermelha (erro de validação)
+                const cell = this.imoveisTable.getCell(row, col);
+                if (cell) {
+                    cell.style.backgroundColor = '#fee2e2';
+                    cell.style.border = '2px solid #dc2626';
+                }
+                
+                // Reverter valor imediatamente
+                this.imoveisTable.setDataAtCell(row, col, oldValue, 'revert');
+                
+                // Mostrar erro
+                utils.showAlert(validationError, 'error');
+                continue;
+            }
+
             // Encontrar o imóvel original
             const originalImovel = this.imoveisData.find(i => i.id === imovelId);
             if (!originalImovel) continue;
@@ -249,8 +276,12 @@ class ImoveisManager {
                 // Feedback visual: célula verde (sucesso)
                 if (cell) {
                     cell.style.backgroundColor = '#dcfce7';
+                    cell.style.border = '2px solid #16a34a';
+                    cell.classList.add('cell-edited-success');
                     setTimeout(() => {
                         cell.style.backgroundColor = '';
+                        cell.style.border = '';
+                        cell.classList.remove('cell-edited-success');
                     }, 2000);
                 }
 
@@ -268,6 +299,13 @@ class ImoveisManager {
                 const cell = this.imoveisTable.getCell(row, col);
                 if (cell) {
                     cell.style.backgroundColor = '#fee2e2';
+                    cell.style.border = '2px solid #dc2626';
+                    cell.classList.add('cell-edited-error');
+                    setTimeout(() => {
+                        cell.style.backgroundColor = '';
+                        cell.style.border = '';
+                        cell.classList.remove('cell-edited-error');
+                    }, 3000);
                 }
 
                 // Reverter valor
@@ -276,6 +314,48 @@ class ImoveisManager {
                 utils.showAlert('Erro ao salvar alteração. Tente novamente.', 'error');
             }
         }
+    }
+
+    validateField(fieldName, value) {
+        switch (fieldName) {
+            case 'nome':
+                if (!value || value.trim() === '') {
+                    return 'Nome do imóvel é obrigatório.';
+                }
+                if (value.length > 120) {
+                    return 'Nome do imóvel deve ter no máximo 120 caracteres.';
+                }
+                break;
+                
+            case 'tipo':
+                if (!value || !['Comercial', 'Residencial'].includes(value)) {
+                    return 'Tipo deve ser "Comercial" ou "Residencial".';
+                }
+                break;
+                
+            case 'endereco':
+                if (!value || value.trim() === '') {
+                    return 'Endereço do imóvel é obrigatório.';
+                }
+                break;
+                
+            case 'alugado':
+                if (!value || !['disponivel', 'alugado'].includes(value)) {
+                    return 'Status deve ser "disponivel" ou "alugado".';
+                }
+                break;
+                
+            case 'valor_mercado':
+                const numValue = parseFloat(value);
+                if (isNaN(numValue) || numValue < 0) {
+                    return 'Valor de mercado deve ser um número positivo.';
+                }
+                if (numValue > 999999999.99) {
+                    return 'Valor de mercado não pode exceder R$ 999.999.999,99.';
+                }
+                break;
+        }
+        return null; // Sem erro
     }
 
     async deleteImovel(imovelId) {
@@ -392,35 +472,57 @@ class ImoveisManager {
         const endereco = document.getElementById('search-endereco').value.trim();
         const tipo = document.getElementById('filter-tipo').value;
         const status = document.getElementById('filter-status').value;
+        const valorMin = parseFloat(document.getElementById('filter-valor-min').value) || 0;
+        const valorMax = parseFloat(document.getElementById('filter-valor-max').value) || Infinity;
 
         let filteredImoveis = this.imoveisData;
 
+        // Filtro por endereço
         if (endereco) {
             filteredImoveis = filteredImoveis.filter(imovel => 
-                imovel.endereco.toLowerCase().includes(endereco.toLowerCase())
+                imovel.endereco.toLowerCase().includes(endereco.toLowerCase()) ||
+                imovel.nome.toLowerCase().includes(endereco.toLowerCase())
             );
         }
 
+        // Filtro por tipo
         if (tipo && tipo !== 'Todos') {
             filteredImoveis = filteredImoveis.filter(imovel => imovel.tipo === tipo);
         }
 
+        // Filtro por status
         if (status && status !== 'Todos') {
             const isAlugado = status === 'alugado';
             filteredImoveis = filteredImoveis.filter(imovel => imovel.alugado === isAlugado);
         }
 
+        // Filtro por valor
+        if (valorMin > 0 || valorMax < Infinity) {
+            filteredImoveis = filteredImoveis.filter(imovel => {
+                const valor = imovel.valor_mercado || 0;
+                return valor >= valorMin && valor <= valorMax;
+            });
+        }
+
         this.updateTable(filteredImoveis);
+        
+        // Mostrar contador de resultados
+        const totalResults = filteredImoveis.length;
+        const totalOriginal = this.imoveisData.length;
+        utils.showAlert(`Encontrados ${totalResults} de ${totalOriginal} imóveis`, 'info');
     }
 
     clearFilters() {
         document.getElementById('search-endereco').value = '';
         document.getElementById('filter-tipo').value = 'Todos';
         document.getElementById('filter-status').value = 'Todos';
+        document.getElementById('filter-valor-min').value = '';
+        document.getElementById('filter-valor-max').value = '';
 
         // Verificar se os dados e tabela existem antes de atualizar
         if (this.imoveisData && this.imoveisTable) {
             this.updateTable(this.imoveisData);
+            utils.showAlert(`Mostrando todos os ${this.imoveisData.length} imóveis`, 'info');
         } else {
             // Se não há dados ou tabela, recarregar tudo
             this.loadImoveis();
@@ -450,17 +552,23 @@ class ImoveisManager {
         document.getElementById('search-endereco').value = savedFilters.endereco || '';
         document.getElementById('filter-tipo').value = savedFilters.tipo || 'Todos';
         document.getElementById('filter-status').value = savedFilters.status || 'Todos';
+        document.getElementById('filter-valor-min').value = savedFilters.valorMin || '';
+        document.getElementById('filter-valor-max').value = savedFilters.valorMax || '';
     }
 
     saveFilters() {
         const endereco = document.getElementById('search-endereco').value.trim();
         const tipo = document.getElementById('filter-tipo').value;
         const status = document.getElementById('filter-status').value;
+        const valorMin = document.getElementById('filter-valor-min').value.trim();
+        const valorMax = document.getElementById('filter-valor-max').value.trim();
 
         const filters = {
             endereco: endereco || undefined,
             tipo: tipo !== 'Todos' ? tipo : undefined,
-            status: status !== 'Todos' ? status : undefined
+            status: status !== 'Todos' ? status : undefined,
+            valorMin: valorMin || undefined,
+            valorMax: valorMax || undefined
         };
 
         localStorage.setItem('imoveisFilters', JSON.stringify(filters));

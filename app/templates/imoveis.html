@@ -28,7 +28,7 @@
             <!-- Filtros e Busca -->
             <div class="bg-white shadow rounded-lg mb-6">
                 <div class="px-4 py-5 sm:p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
                         <div>
                             <label for="search-endereco" class="block text-sm font-medium text-gray-700">Buscar por Endereço</label>
                             <input type="text" id="search-endereco" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
@@ -36,21 +36,26 @@
                         <div>
                             <label for="filter-tipo" class="block text-sm font-medium text-gray-700">Tipo</label>
                             <select id="filter-tipo" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                                <option value="">Todos</option>
-                                <option value="casa">Casa</option>
-                                <option value="apartamento">Apartamento</option>
-                                <option value="comercial">Comercial</option>
-                                <option value="terreno">Terreno</option>
+                                <option value="Todos">Todos</option>
+                                <option value="Comercial">Comercial</option>
+                                <option value="Residencial">Residencial</option>
                             </select>
                         </div>
                         <div>
                             <label for="filter-status" class="block text-sm font-medium text-gray-700">Status</label>
                             <select id="filter-status" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
-                                <option value="">Todos</option>
+                                <option value="Todos">Todos</option>
                                 <option value="disponivel">Disponível</option>
                                 <option value="alugado">Alugado</option>
-                                <option value="manutencao">Manutenção</option>
                             </select>
+                        </div>
+                        <div>
+                            <label for="filter-valor-min" class="block text-sm font-medium text-gray-700">Valor Mínimo (R$)</label>
+                            <input type="number" id="filter-valor-min" placeholder="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="filter-valor-max" class="block text-sm font-medium text-gray-700">Valor Máximo (R$)</label>
+                            <input type="number" id="filter-valor-max" placeholder="999999999" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                         </div>
                         <div class="flex items-end space-x-2">
                             <button id="search-btn" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">
@@ -59,9 +64,9 @@
                                 </svg>
                                 Buscar
                             </button>
-                            <button id="clear-filters-btn" class="inline-flex items-center rounded-md bg-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-400">
+                            <button id="clear-filters-btn" class="inline-flex items-center rounded-md bg-gray-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-gray-500">
                                 <svg class="-ml-0.5 mr-1.5 h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+                                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/>
                                 </svg>
                                 Limpar
                             </button>
