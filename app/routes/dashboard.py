@@ -23,12 +23,19 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     # Contar imóveis
     total_imoveis = db.query(Imovel).count()
     
-    # Receita do mês atual (todos os aluguéis mensais são considerados recebidos)
+    # Receita do mês atual (soma única dos valores totais por imóvel)
     hoje = datetime.now()
-    receita_mensal = db.query(func.sum(AluguelMensal.valor_total)).filter(
+    
+    # Subquery para obter valor_total único por imóvel no mês
+    subquery = db.query(
+        AluguelMensal.id_imovel,
+        func.max(AluguelMensal.valor_total).label('valor_total_unico')
+    ).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
         extract('month', AluguelMensal.data_referencia) == hoje.month
-    ).scalar() or 0
+    ).group_by(AluguelMensal.id_imovel).subquery()
+    
+    receita_mensal = db.query(func.sum(subquery.c.valor_total_unico)).scalar() or 0
     
     # Aluguéis ativos (todos os registros do mês atual)
     alugueis_ativos = db.query(func.count(func.distinct(AluguelMensal.id))).filter(
