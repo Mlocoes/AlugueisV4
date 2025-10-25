@@ -178,16 +178,39 @@ class AlugueisManager {
                     }, // Data Referência
                     {
                         type: 'numeric',
-                        numericFormat: { pattern: '0,0.00' },
-                        readOnly: !isAdmin
+                        readOnly: !isAdmin,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            if (value !== null && value !== undefined && value !== '') {
+                                td.innerHTML = utils.formatCurrency(value);
+                            } else {
+                                td.innerHTML = '';
+                            }
+                            return td;
+                        }
                     }, // Valor Total
                     {
                         type: 'numeric',
-                        readOnly: !isAdmin
+                        readOnly: !isAdmin,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            if (value !== null && value !== undefined && value !== '') {
+                                td.innerHTML = utils.formatCurrency(value);
+                            } else {
+                                td.innerHTML = '';
+                            }
+                            return td;
+                        }
                     }, // Valor Proprietário
                     {
                         type: 'numeric',
-                        readOnly: !isAdmin
+                        readOnly: !isAdmin,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            if (value !== null && value !== undefined && value !== '') {
+                                td.innerHTML = utils.formatCurrency(value);
+                            } else {
+                                td.innerHTML = '';
+                                return td;
+                            }
+                        }
                     }, // Taxa Administração
                     {
                         type: 'text',
