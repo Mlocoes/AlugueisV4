@@ -9,7 +9,7 @@ from app.models.usuario import Usuario
 
 router = APIRouter()
 
-@router.get("/", response_model=List[Imovel])
+@router.get("/")
 def read_imoveis(
     skip: int = 0,
     limit: int = 100,
@@ -18,24 +18,49 @@ def read_imoveis(
 ):
     imoveis = db.query(ImovelModel).offset(skip).limit(limit).all()
     
-    # Converter manualmente para evitar problemas de conversão automática do Pydantic
+    # Converter com máxima segurança
     result = []
     for imovel in imoveis:
-        imovel_dict = {
-            'id': imovel.id,
-            'nome': imovel.nome,
-            'endereco': imovel.endereco,
-            'tipo': imovel.tipo,
-            'area_total': imovel.area_total,
-            'area_construida': imovel.area_construida,
-            'valor_catastral': imovel.valor_catastral,
-            'valor_mercado': imovel.valor_mercado,
-            'iptu_anual': imovel.iptu_anual,
-            'condominio': imovel.condominio,
-            'alugado': bool(imovel.alugado) if imovel.alugado is not None else False,
-            'ativo': bool(imovel.ativo) if imovel.ativo is not None else True
-        }
-        result.append(imovel_dict)
+        try:
+            # Função auxiliar para conversão segura
+            def safe_float(value):
+                if value is None:
+                    return None
+                try:
+                    # Verificar se é NaN
+                    if str(value).lower() == 'nan':
+                        return None
+                    return float(value)
+                except:
+                    return None
+            
+            def safe_bool(value):
+                if value is None:
+                    return False
+                try:
+                    return bool(value)
+                except:
+                    return False
+            
+            imovel_dict = {
+                'id': imovel.id,
+                'nome': imovel.nome or '',
+                'endereco': imovel.endereco or '',
+                'tipo': imovel.tipo or '',
+                'area_total': safe_float(imovel.area_total),
+                'area_construida': safe_float(imovel.area_construida),
+                'valor_catastral': safe_float(imovel.valor_catastral),
+                'valor_mercado': safe_float(imovel.valor_mercado),
+                'iptu_anual': safe_float(imovel.iptu_anual),
+                'condominio': safe_float(imovel.condominio),
+                'alugado': safe_bool(imovel.alugado),
+                'ativo': safe_bool(imovel.ativo)
+            }
+            result.append(imovel_dict)
+        except Exception as e:
+            # Em caso de erro, pular este imóvel e continuar
+            print(f"Aviso: Pulando imóvel ID {imovel.id} devido a erro: {e}")
+            continue
     
     return result
 

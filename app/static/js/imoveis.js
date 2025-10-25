@@ -36,7 +36,7 @@ class ImoveisManager {
                 // Tentar login com credenciais de teste
                 const formData = new FormData();
                 formData.append('username', 'admin');
-                formData.append('password', '123');
+                formData.append('password', 'admin00');
 
                 const response = await fetch('/auth/login', {
                     method: 'POST',
@@ -418,10 +418,21 @@ class ImoveisManager {
         document.getElementById('filter-tipo').value = 'Todos';
         document.getElementById('filter-status').value = 'Todos';
 
-        this.updateTable(this.imoveisData);
+        // Verificar se os dados e tabela existem antes de atualizar
+        if (this.imoveisData && this.imoveisTable) {
+            this.updateTable(this.imoveisData);
+        } else {
+            // Se não há dados ou tabela, recarregar tudo
+            this.loadImoveis();
+        }
     }
 
     updateTable(data) {
+        if (!this.imoveisTable) {
+            console.error('Tabela não inicializada. Tentando inicializar...');
+            return;
+        }
+
         this.imoveisTable.loadData(data.map(imovel => [
             imovel.id,
             imovel.nome,
