@@ -1,6 +1,6 @@
 # 🎯 PROGRESSO DA IMPLEMENTAÇÃO - Sistema de Gestão de Aluguéis V4
 
-## 📊 Status Geral: 85% Completo
+## 📊 Status Geral: 90% Completo
 
 ---
 
@@ -178,12 +178,105 @@ Todos os botões de criação e modais marcados com `data-admin-only`:
 
 ---
 
+## ✅ Versão 1.2.1 - Correções Críticas e Estabilidade (COMPLETO)
+
+### Correções de JavaScript Frontend
+**Problemas Resolvidos:**
+- ✅ Erro "Cannot read properties of undefined (reading 'isAdmin')" - Corrigido carregamento de dependências
+- ✅ Erro "Cannot read properties of null (reading 'loadData')" - Adicionadas verificações de inicialização
+- ✅ Erro "Cannot read properties of undefined (reading 'find')" - Corrigida ordem de carregamento de módulos
+- ✅ Erro 500 Internal Server Error na API `/api/imoveis` - Implementada conversão segura de tipos Decimal
+
+**Arquivos Corrigidos:**
+- ✅ `app/static/js/imoveis.js` - Verificações de null e inicialização segura
+- ✅ `app/static/js/alugueis.js` - Filtros aplicados automaticamente, verificações de tabela
+- ✅ `app/static/js/participacoes.js` - Ordem de carregamento corrigida (imóveis → proprietários → participações)
+- ✅ `app/routes/imoveis.py` - Conversão ultra-segura de dados Decimal para JSON
+
+### Correção do Cálculo de Receita Mensal
+**Problema:** Dashboard mostrava 120.525,96 ao invés de 112.489,99 (conforme planilha)
+
+**Causa:** Query SQL filtrava apenas valores positivos, excluindo custos/negativos necessários para receita total
+
+**Solução:**
+- ✅ Removido filtro `valor_total > 0` da query de receita mensal
+- ✅ Aplicado correção tanto em estatísticas quanto gráficos
+- ✅ Receita agora inclui valores positivos E negativos
+
+**Arquivo:** `app/routes/dashboard.py`
+
+**Antes:**
+```sql
+WHERE AluguelMensal.valor_total > 0  -- Só positivos
+```
+
+**Depois:**
+```sql
+-- Sem filtro: inclui positivos E negativos para receita total
+```
+
+### Validações e Testes
+**Testes Implementados:**
+- ✅ `test_final.py` - Teste completo do sistema (login, CRUD, frontend)
+- ✅ Validação de receita mensal: 112.489,99 ✅
+- ✅ Verificação de ausência de erros JavaScript
+- ✅ Testes de endpoints PUT para atualizações
+
+**Resultados:**
+```
+🎉 RESUMO FINAL:
+✅ Endpoint PUT para alugueis mensais implementado e funcionando
+✅ Verificações de segurança no frontend implementadas
+✅ Erro 'Cannot read properties of undefined (reading 'isAdmin')' resolvido
+✅ Sistema de autenticação funcionando corretamente
+✅ Operações CRUD completas funcionando
+🚀 SISTEMA PRONTO PARA USO!
+```
+
+---
+
 ## 📋 Pendências e Próximos Passos
+
+### 🔥 Versão 1.2.2 - Correção Urgente: Erro 500 no PUT de Imóveis (EM ANDAMENTO)
+
+**Erro Atual:**
+```
+PUT http://192.168.0.7:8000/api/imoveis/13 500 (Internal Server Error)
+```
+
+**Sintomas:**
+- Edição inline em tabelas Handsontable falhando
+- Erro ocorre ao tentar salvar alterações em imóveis
+- Frontend mostra "Erro ao atualizar imóvel"
+
+**Diagnóstico Necessário:**
+- [ ] Investigar logs do backend para causa do erro 500
+- [ ] Verificar schema Pydantic para validação de imóveis
+- [ ] Testar conversão de dados na atualização
+- [ ] Verificar se problema é específico do imóvel ID 13
+
+**Solução Esperada:**
+- [ ] Corrigir validação/conversion no endpoint PUT
+- [ ] Implementar tratamento de erro mais robusto
+- [ ] Testar edição inline funcionando
+
+**Ações realizadas (atualização):**
+- [x] Inspecionei o código do endpoint `update_imovel` em `app/routes/imoveis.py` e adicionei conversão segura de campos numéricos para `Decimal` antes da atribuição.
+- [x] Adicionei `try/except` ao `db.commit()` para capturar exceções e retornar um `HTTPException(500)` com detalhe — isso evita 500 genéricos sem informação.
+- [x] Reproduzi o problema localmente parcialmente (logs indicam erros anteriores relacionados a validação de `usuarios` e disponibilidade do banco PostgreSQL em algumas reinicializações). O `server.log` foi consultado e contém tracebacks úteis.
+
+**Observações temporárias e próximos passos imediatos:**
+- O servidor por vezes reinicia (WatchFiles) e há mensagens de erro no `server.log` indicando problemas de conexão com o PostgreSQL quando o ambiente é reiniciado. Garanta que o DB esteja rodando (Postgres) antes de iniciar o backend.
+- Próximo passo: executar um PUT de teste programático (curl/python requests) contra `/api/imoveis/{id}` para verificar se o backend retorna um JSON de erro legível ou sucesso. Se o problema persistir, iremos registrar o JSON de erro e aplicar correções específicas na validação dos campos.
+
+**Checkpoint:**
+- Código `app/routes/imoveis.py` atualizado com conversão segura e tratamento de erros. Commit realizado.
+
 
 ### Versão 1.3 - Edição Inline e Filtros Avançados (PRÓXIMO)
 
 #### Edição Inline com Handsontable
-- [ ] Permitir edição direta nas células da tabela
+- [ ] Permitir edição direta nas células da tabela (depende da correção acima)
 - [ ] Validação inline de dados
 - [ ] Salvar automaticamente ao sair da célula
 - [ ] Destaque visual de células editadas
@@ -396,6 +489,8 @@ Para dúvidas ou sugestões, consulte a documentação ou entre em contato com a
 
 ---
 
-**Última Atualização:** 2024
-**Versão Atual:** 1.2
-**Progresso:** 85% ✅
+**Última Atualização:** 25 de outubro de 2025
+**Versão Atual:** 1.2.1
+**Progresso:** 90% ✅
+
+**Status Atual:** Sistema funcional com pequena correção pendente no PUT de imóveis
