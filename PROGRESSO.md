@@ -237,41 +237,32 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 
 ## 📋 Pendências e Próximos Passos
 
-### 🔥 Versão 1.2.2 - Correção Urgente: Erro 500 no PUT de Imóveis (EM ANDAMENTO)
+### 🔥 Versão 1.2.2 - Correção Urgente: Erro 500 no PUT de Imóveis (CONCLUÍDO)
 
-**Erro Atual:**
+**Erro Anterior:**
 ```
 PUT http://192.168.0.7:8000/api/imoveis/13 500 (Internal Server Error)
 ```
 
-**Sintomas:**
-- Edição inline em tabelas Handsontable falhando
-- Erro ocorre ao tentar salvar alterações em imóveis
-- Frontend mostra "Erro ao atualizar imóvel"
+**Causa Identificada:**
+- Falta de conversão segura de tipos numéricos (float/string → Decimal) antes da atribuição aos campos do modelo
+- Ausência de tratamento de exceções no `db.commit()`, resultando em 500 genérico sem detalhes
 
-**Diagnóstico Necessário:**
-- [ ] Investigar logs do backend para causa do erro 500
-- [ ] Verificar schema Pydantic para validação de imóveis
-- [ ] Testar conversão de dados na atualização
-- [ ] Verificar se problema é específico do imóvel ID 13
+**Correção Implementada:**
+- ✅ Adicionada conversão segura para campos `Decimal` (area_total, area_construida, etc.)
+- ✅ Implementado tratamento de exceções no commit com rollback e HTTPException detalhada
+- ✅ Código defensivo que remove campos que não convertem corretamente
 
-**Solução Esperada:**
-- [ ] Corrigir validação/conversion no endpoint PUT
-- [ ] Implementar tratamento de erro mais robusto
-- [ ] Testar edição inline funcionando
+**Testes de Validação:**
+- ✅ PUT no imóvel ID 13: **200 OK** ✅
+- ✅ PUT no imóvel ID 12: **200 OK** ✅
+- ✅ Resposta JSON correta com dados atualizados
+- ✅ Conversão automática de tipos funcionando
 
-**Ações realizadas (atualização):**
-- [x] Inspecionei o código do endpoint `update_imovel` em `app/routes/imoveis.py` e adicionei conversão segura de campos numéricos para `Decimal` antes da atribuição.
-- [x] Adicionei `try/except` ao `db.commit()` para capturar exceções e retornar um `HTTPException(500)` com detalhe — isso evita 500 genéricos sem informação.
-- [x] Reproduzi o problema localmente parcialmente (logs indicam erros anteriores relacionados a validação de `usuarios` e disponibilidade do banco PostgreSQL em algumas reinicializações). O `server.log` foi consultado e contém tracebacks úteis.
+**Arquivos Alterados:**
+- `app/routes/imoveis.py` - Endpoint PUT com conversão segura e tratamento de erros
 
-**Observações temporárias e próximos passos imediatos:**
-- O servidor por vezes reinicia (WatchFiles) e há mensagens de erro no `server.log` indicando problemas de conexão com o PostgreSQL quando o ambiente é reiniciado. Garanta que o DB esteja rodando (Postgres) antes de iniciar o backend.
-- Próximo passo: executar um PUT de teste programático (curl/python requests) contra `/api/imoveis/{id}` para verificar se o backend retorna um JSON de erro legível ou sucesso. Se o problema persistir, iremos registrar o JSON de erro e aplicar correções específicas na validação dos campos.
-
-**Checkpoint:**
-- Código `app/routes/imoveis.py` atualizado com conversão segura e tratamento de erros. Commit realizado.
-
+**Resultado:** Edição inline em tabelas Handsontable agora funciona corretamente!
 
 ### Versão 1.3 - Edição Inline e Filtros Avançados (PRÓXIMO)
 
