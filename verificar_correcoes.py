@@ -56,17 +56,39 @@ def test_frontend_fixes():
         return False
     print("     ✅ Página carrega OK")
 
-    # Teste 2: Verificar se o JavaScript main.js tem as correções
+    # Teste 2: Verificar se o JavaScript imoveis.js tem as correções
     print("  2. Verificando correções no JavaScript...")
     try:
-        with open("app/static/js/main.js", "r", encoding="utf-8") as f:
+        with open("app/static/js/imoveis.js", "r", encoding="utf-8") as f:
             js_content = f.read()
-        if "if (!api || !api.isAdmin)" not in js_content:
-            print("     ❌ Correções no JavaScript não encontradas")
+        # Verificar função de validação
+        if "validateField(fieldName, value)" not in js_content:
+            print("     ❌ Função validateField não encontrada")
+            return False
+        # Verificar tratamento de null/undefined
+        if "value === null || value === undefined" not in js_content:
+            print("     ❌ Tratamento de null/undefined não encontrado")
+            return False
+        # Verificar conversão segura
+        if "String(value).trim()" not in js_content:
+            print("     ❌ Conversão segura não encontrada")
             return False
         print("     ✅ Correções no JavaScript OK")
     except FileNotFoundError:
         print("     ❌ Arquivo JavaScript não encontrado")
+        return False
+
+    # Teste 3: Verificar se o CSS não tem @apply
+    print("  3. Verificando correções no CSS...")
+    try:
+        with open("app/static/css/style.css", "r", encoding="utf-8") as f:
+            css_content = f.read()
+        if "@apply" in css_content:
+            print("     ❌ Ainda há @apply no CSS")
+            return False
+        print("     ✅ Correções no CSS OK")
+    except FileNotFoundError:
+        print("     ❌ Arquivo CSS não encontrado")
         return False
 
     return True
