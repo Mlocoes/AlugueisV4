@@ -18,6 +18,8 @@ class ParticipacoesManager {
     async init() {
         await this.checkAuth();
         await this.loadData();
+        // Obter permissões do usuário para controlar ações por proprietário
+        this.permissions = await this.apiClient.getMyPermissions();
         this.setupEventListeners();
         
         // Controle de acesso baseado em papel
@@ -34,22 +36,11 @@ class ParticipacoesManager {
                 // Tentar login com credenciais de teste
                 const formData = new FormData();
                 formData.append('username', 'admin');
-                formData.append('password', 'admin00');
+                formData.append('password', 'admin123');
 
-                const response = await fetch('/auth/login', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Login automático bem-sucedido');
-                    this.apiClient.setToken(data.access_token);
-                    await this.apiClient.getCurrentUser();
-                } else {
-                    console.log('Login automático falhou, redirecionando para login');
-                    window.location.href = '/login';
-                }
+                const response = await this.apiClient.login('admin', 'admin123');
+                console.log('Login automático bem-sucedido');
+                await this.apiClient.getCurrentUser();
             } catch (loginError) {
                 console.log('Erro no login automático, redirecionando para login');
                 window.location.href = '/login';
@@ -139,6 +130,8 @@ class ParticipacoesManager {
     async loadParticipacoes() {
         try {
             const participacoes = await this.apiClient.get('/api/participacoes/');
+            // armazenar dados originais para lookup de permissões
+            this.participacoesData = participacoes;
 
             const container = document.getElementById('participacoes-table');
 
@@ -190,12 +183,22 @@ class ParticipacoesManager {
                         type: 'text',
                         readOnly: true,
                         renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                            const participacaoId = instance.getDataAtRow(row)[0];
-                            td.innerHTML = `
-                                <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="participacoesManager.editParticipacao(${participacaoId})">Editar</button>
-                                <button class="text-red-600 hover:text-red-800" onclick="participacoesManager.deleteParticipacao(${participacaoId})">Excluir</button>
-                            `;
-                        }
+                                const participacaoId = instance.getDataAtRow(row)[0];
+                                // Obter proprietario do registro para checar permissão
+                                const part = participacoesManager.participacoesData ? participacoesManager.participacoesData.find(p => p.id === participacaoId) : null;
+                                const ownerId = part ? part.id_proprietario : null;
+                                const isAdmin = participacoesManager.apiClient.isAdmin();
+                                const canEditSet = new Set((participacoesManager.permissions && participacoesManager.permissions.editar) || []);
+                                const canEdit = isAdmin || (ownerId !== null && canEditSet.has(ownerId));
+                                if (canEdit) {
+                                    td.innerHTML = `
+                                        <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="participacoesManager.editParticipacao(${participacaoId})">Editar</button>
+                                        <button class="text-red-600 hover:text-red-800" onclick="participacoesManager.deleteParticipacao(${participacaoId})">Excluir</button>
+                                    `;
+                                } else {
+                                    td.innerHTML = '-';
+                                }
+                            }
                     }
                 ],
                 height: 500,
@@ -277,6 +280,8 @@ class ParticipacoesManager {
             console.warn('Tabela de participações ainda não foi inicializada');
             return;
         }
+        // atualizar cache local
+        this.participacoesData = participacoes;
         
         const data = participacoes.map(part => {
             const imovel = this.imoveis.find(i => i.id === part.id_imovel);

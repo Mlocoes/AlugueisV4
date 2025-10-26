@@ -75,12 +75,25 @@ class ImportacaoAvancadaService:
         # Remove "R$", espaços e outros caracteres não numéricos exceto vírgula e ponto
         s = re.sub(r'[R$\s]', '', s)
 
-        # Detectar formato: se tem vírgula E ponto, assumir brasileiro
-        # Se tem apenas vírgula, assumir brasileiro
-        # Se tem apenas ponto, assumir americano
+        # Detectar formato: se tem vírgula E ponto, tentar identificar qual é o separador decimal
+        # Ex.:
+        #  - Brasileiro: 1.234,56 -> '.' milhares, ',' decimal
+        #  - Americano: 2,500.00 -> ',' milhares, '.' decimal
         if ',' in s and '.' in s:
-            # Formato brasileiro: 1.234,56 -> 1234.56
-            s = s.replace('.', '').replace(',', '.')
+            # Determinar qual separador aparece por último; o separador decimal normalmente
+            # aparece mais à direita e costuma ter 2 casas decimais.
+            last_dot = s.rfind('.')
+            last_comma = s.rfind(',')
+            # Se o ponto vem depois da vírgula e tem até 2 dígitos após ele, é provavelmente o separador decimal (US)
+            if last_dot > last_comma and (len(s) - last_dot - 1) <= 2:
+                # Formato americano: remover vírgulas (milhares)
+                s = s.replace(',', '')
+            # Se a vírgula vem depois do ponto e tem até 2 dígitos após ela, é formato brasileiro
+            elif last_comma > last_dot and (len(s) - last_comma - 1) <= 2:
+                s = s.replace('.', '').replace(',', '.')
+            else:
+                # Fallback conservador: remover separadores de milhares (vírgulas)
+                s = s.replace(',', '')
         elif ',' in s and '.' not in s:
             # Apenas vírgula: 1234,56 -> 1234.56
             s = s.replace(',', '.')

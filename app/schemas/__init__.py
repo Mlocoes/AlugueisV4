@@ -205,7 +205,7 @@ class PermissaoFinanceiraUpdate(BaseModel):
 
 class PermissaoFinanceira(PermissaoFinanceiraBase):
     id: int
-    data_criacao: date
+    data_criacao: datetime
 
     class Config:
         from_attributes = True

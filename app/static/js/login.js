@@ -82,16 +82,13 @@ class LoginManager {
             console.log('Enviando requisição de login...');
             const response = await this.apiClient.login(username, password);
 
-            // Salvar token se "lembrar-me" estiver marcado (atualizar storage)
-            if (rememberMe) {
-                localStorage.setItem('token', response.access_token);
-                sessionStorage.removeItem('token'); // Remover do session se estiver no local
-            } else {
-                sessionStorage.setItem('token', response.access_token);
-                localStorage.removeItem('token'); // Remover do local se estiver no session
+            // O servidor definiu o cookie HttpOnly com o token; nós não podemos ler o token.
+            // Salvar apenas informações de UX (se houver) e redirecionar.
+            try {
+                await this.apiClient.getCurrentUser();
+            } catch (e) {
+                // Não bloquear o redirecionamento se falhar
             }
-
-            // Redirecionar para dashboard
             window.location.href = '/';
 
         } catch (error) {

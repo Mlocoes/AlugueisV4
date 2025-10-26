@@ -98,6 +98,23 @@ def can_edit_financial_data(user: Usuario, proprietario_id: int, db: Session) ->
     return permissao is not None
 
 
+def can_view_financial_data(user: Usuario, proprietario_id: int, db: Session) -> bool:
+    """
+    Verifica se o usuário pode visualizar dados financeiros de um proprietário específico.
+    Usa a flag `visualizar` na tabela de permissões. Admins podem ver tudo.
+    """
+    if is_admin(user):
+        return True
+
+    permissao = db.query(PermissaoFinanceira).filter(
+        PermissaoFinanceira.id_usuario == user.id,
+        PermissaoFinanceira.id_proprietario == proprietario_id,
+        PermissaoFinanceira.visualizar == True
+    ).first()
+
+    return permissao is not None
+
+
 def filter_inactive_records(query, user: Usuario, active_field: str = 'ativo'):
     """
     Filtra registros inativos para usuários comuns.

@@ -72,8 +72,9 @@ def read_participacao(
     if db_participacao is None:
         raise HTTPException(status_code=404, detail="Participacao not found")
     
-    # Verificar se usuário tem permissão para ver esta participação
-    if not can_edit_financial_data(current_user, db_participacao.id_proprietario, db):
+    # Verificar se usuário tem permissão para ver esta participação (visualizar)
+    from app.core.permissions import can_view_financial_data
+    if not can_view_financial_data(current_user, db_participacao.id_proprietario, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem permissão para acessar esta participação"

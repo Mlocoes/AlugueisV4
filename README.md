@@ -55,6 +55,22 @@ Sistema completo para gestão de imóveis, aluguéis e proprietários com contro
 
 ### ⚠️ Parcialmente Implementado (30-50%)
 - **Controle de Acesso**: Estrutura existe, lógica não aplicada
+
+### Permissões financeiras (visualizar vs editar)
+
+- O sistema tem um modelo granular de permissões financeiras (`permissoes_financeiras`) que relaciona usuários a proprietários com duas flags:
+   - `visualizar` — permite ver (leitura) os dados financeiros do proprietário;
+   - `editar` — permite criar/alterar/excluir dados financeiros do proprietário.
+
+- Com a correção recente, endpoints de leitura (relatórios, listagens, detalhes) respeitam a flag `visualizar` enquanto operações mutativas (POST/PUT/DELETE) exigem `editar`.
+
+- Observações de rollout:
+   - Administradores (`tipo == 'administrador'`) têm acesso total por padrão.
+   - Relatórios e dashboard aplicam filtros a nível de banco (WHERE id_proprietario IN (...)) para evitar exposição acidental de dados e para melhor desempenho.
+   - Frontend tenta ocultar controles de edição quando o usuário não tem a flag `editar`; ainda assim o backend valida permissões em todos endpoints (sempre confie no backend para segurança).
+
+Consulte `app/core/permissions.py` para comportamento e os routers em `app/routes/` para exemplos de aplicação.
+
 - **Validações de Negócio**: Básicas apenas (falta soma participações = 100%)
 - **Relatórios**: Template existe, filtros não funcionam completamente
 - **Filtros Avançados**: Estrutura básica, funcionalidade limitada
@@ -363,6 +379,38 @@ O sistema utiliza **JWT (JSON Web Tokens)** para autenticação:
    ```
 
 **Desenvolvimento**: Login automático habilitado com `admin/123`
+
+### Autenticação por Cookie HttpOnly (nova)
+
+A partir desta versão o fluxo de autenticação foi adaptado para usar um cookie HttpOnly chamado `access_token` em vez de confiar no armazenamento local do navegador. Principais pontos:
+
+- Em desenvolvimento o cookie é enviado com `SameSite=Lax` e `secure=false` para facilitar testes locais.
+- Em produção defina a variável de ambiente `APP_ENV=production` e **obrigatoriamente** configure `SECRET_KEY` e `ALLOWED_ORIGINS`.
+- Em produção o cookie será enviado com `Secure` além de `HttpOnly` e `SameSite=Lax`.
+
+Recomendações para deploy seguro:
+
+- Exigir HTTPS no ambiente de produção (obrigatório para cookies `Secure`).
+- Configurar um domínio específico em `ALLOWED_ORIGINS` em vez de `*`.
+- Implementar proteção CSRF se você permitir requests state-changing a partir de navegadores externos. Uma opção simples é usar o padrão "double-submit cookie": gerar um CSRF token exposto ao JavaScript (não HttpOnly) e enviar como header nas requisições POST/PUT/DELETE.
+
+Como testar localmente com curl:
+
+```bash
+# Login e salvar cookies
+curl -c /tmp/cookies.txt -d "username=admin&password=admin123" http://localhost:8000/auth/login
+
+# Usar cookie em requisição autenticada
+curl -b /tmp/cookies.txt http://localhost:8000/auth/me
+
+# Logout (cookie expirado pelo servidor)
+curl -b /tmp/cookies.txt -X POST http://localhost:8000/auth/logout
+```
+
+Notas de migração:
+
+- O frontend já foi atualizado para enviar `credentials: 'include'` nas requisições e remover a lógica de salvar tokens no `localStorage`.
+- Se você possui scripts que usam tokens em headers, atualize-os para usar o cookie `access_token` ou manter o header Authorization como fallback (o servidor aceita ambos).
 
 ## 📈 Regras de Negócio
 

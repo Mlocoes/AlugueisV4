@@ -33,22 +33,12 @@ class DashboardManager {
             // Tentar login com credenciais de teste
             const formData = new FormData();
             formData.append('username', 'admin');
-            formData.append('password', 'admin00');
+            formData.append('password', 'admin123');
 
-            const response = await fetch('/auth/login', {
-                method: 'POST',
-                body: formData
-            });
-
-            if (response.ok) {
-                const data = await response.json();
-                console.log('Login automático bem-sucedido');
-                this.apiClient.setToken(data.access_token);
-                // Obter informações do usuário
-                await this.apiClient.getCurrentUser();
-            } else {
-                console.log('Login automático falhou, continuando sem autenticação');
-            }
+            const response = await this.apiClient.login('admin', 'admin123');
+            // Se a chamada não lançar exceção, considerar login bem-sucedido
+            console.log('Login automático bem-sucedido');
+            await this.apiClient.getCurrentUser();
         } catch (error) {
             console.log('Erro no login automático:', error);
         }

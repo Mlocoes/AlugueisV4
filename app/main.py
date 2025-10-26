@@ -1,11 +1,13 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import FileResponse
+from app.core.auth import get_current_active_user
 from app.core.config import settings
+from app.core.config import APP_ENV
 from app.core.database import engine, Base
-from app.routes import auth, usuarios, imoveis, participacoes, alugueis, alias, transferencias, permissoes_financeiras, dashboard, import_routes
+from app.routes import auth, usuarios, imoveis, participacoes, alugueis, alias, transferencias, permissoes_financeiras, dashboard, import_routes, relatorios
 
 # Criar tabelas
 Base.metadata.create_all(bind=engine)
@@ -15,6 +17,20 @@ app = FastAPI(
     description="Sistema completo para gestão de imóveis e aluguéis",
     version="1.0.0"
 )
+
+
+# Middleware simples de proteção CSRF: em produção requer que requisições mutantes
+# (POST/PUT/DELETE/PATCH) tragam o header X-CSRF-Token igual ao cookie 'csrf_token'.
+@app.middleware("http")
+async def csrf_protect(request: Request, call_next):
+    if APP_ENV == 'production' and request.method.upper() in ("POST", "PUT", "DELETE", "PATCH"):
+        # Ler cookie e header
+        cookie_csrf = request.cookies.get('csrf_token')
+        header_csrf = request.headers.get('x-csrf-token')
+        if not cookie_csrf or not header_csrf or cookie_csrf != header_csrf:
+            from fastapi.responses import JSONResponse
+            return JSONResponse({'detail': 'CSRF token missing or invalid'}, status_code=403)
+    return await call_next(request)
 
 # Configurar CORS
 app.add_middleware(
@@ -42,6 +58,7 @@ app.include_router(transferencias.router, prefix="/api/transferencias", tags=["T
 app.include_router(permissoes_financeiras.router, prefix="/api/permissoes_financeiras", tags=["Permissões Financeiras"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(import_routes.router, prefix="/api/importacao", tags=["Importação"])
+app.include_router(relatorios.router, prefix="/api/relatorios", tags=["Relatórios"])
 
 @app.get("/")
 async def root(request: Request):
@@ -88,7 +105,7 @@ import os
 
 # Rotas para download de modelos Excel
 @app.get("/Proprietarios.xlsx")
-async def download_proprietarios_model():
+async def download_proprietarios_model(current_user=Depends(get_current_active_user)):
     """Serve o arquivo modelo Excel para proprietários"""
     return FileResponse(
         path=os.path.join(os.path.dirname(__file__), "..", "Proprietarios.xlsx"),
@@ -97,7 +114,7 @@ async def download_proprietarios_model():
     )
 
 @app.get("/Imoveis.xlsx")
-async def download_imoveis_model():
+async def download_imoveis_model(current_user=Depends(get_current_active_user)):
     """Serve o arquivo modelo Excel para imóveis"""
     return FileResponse(
         path=os.path.join(os.path.dirname(__file__), "..", "Imoveis.xlsx"),
@@ -106,7 +123,7 @@ async def download_imoveis_model():
     )
 
 @app.get("/Alugueis.xlsx")
-async def download_alugueis_model():
+async def download_alugueis_model(current_user=Depends(get_current_active_user)):
     """Serve o arquivo modelo Excel para aluguéis"""
     return FileResponse(
         path=os.path.join(os.path.dirname(__file__), "..", "Alugueis.xlsx"),
@@ -115,7 +132,7 @@ async def download_alugueis_model():
     )
 
 @app.get("/Participacoes.xlsx")
-async def download_participacoes_model():
+async def download_participacoes_model(current_user=Depends(get_current_active_user)):
     """Serve o arquivo modelo Excel para participações"""
     return FileResponse(
         path=os.path.join(os.path.dirname(__file__), "..", "Participacoes.xlsx"),

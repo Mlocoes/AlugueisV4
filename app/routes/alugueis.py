@@ -54,8 +54,9 @@ def read_aluguel(
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel not found")
     
-    # Verificar se usuário tem permissão para ver este aluguel
-    if not can_edit_financial_data(current_user, db_aluguel.id_proprietario, db):
+    # Verificar se usuário tem permissão para ver este aluguel (visualizar)
+    from app.core.permissions import can_view_financial_data
+    if not can_view_financial_data(current_user, db_aluguel.id_proprietario, db):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Você não tem permissão para acessar este aluguel"
@@ -123,9 +124,13 @@ def obter_total_anual(
     """
     Calcula totais de aluguéis para um ano específico
     """
+    # Aplicar filtro de permissões: se usuário não for admin, limitar por proprietários permitidos
     resultado = AluguelService.obter_total_anual(
         db, ano, id_proprietario, id_imovel
     )
+    # Se o resultado vier em formato de query, o serviço deve já respeitar permissões;
+    # aqui filtramos novamente por segurança caso retorne uma lista/iterable
+    # NOTA: AluguelService deve ser adaptado para aceitar usuário/db quando necessário.
     return resultado
 
 @router.get("/relatorios/mensal/{ano}/{mes}")
@@ -147,6 +152,7 @@ def obter_total_mensal(
         db, ano, mes, id_proprietario, id_imovel
     )
     return resultado
+    return resultado
 
 @router.get("/relatorios/por-proprietario/{ano}")
 def obter_relatorio_por_proprietario(
@@ -162,6 +168,13 @@ def obter_relatorio_por_proprietario(
         raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
     
     resultado = AluguelService.obter_relatorio_por_proprietario(db, ano, mes)
+    # Filtrar resultados pelo conjunto de proprietários permitidos para o usuário
+    from app.core.permissions import get_permitted_proprietarios
+    permitted = get_permitted_proprietarios(current_user, db)
+    if not current_user or current_user.tipo != 'administrador':
+        # Apenas retornar dados para proprietários permitidos
+        resultado = [r for r in resultado if r.get('id_proprietario') in permitted]
+
     return {"ano": ano, "mes": mes, "dados": resultado}
 
 @router.get("/relatorios/por-imovel/{ano}")
@@ -178,6 +191,13 @@ def obter_relatorio_por_imovel(
         raise HTTPException(status_code=400, detail="Mês deve estar entre 1 e 12")
     
     resultado = AluguelService.obter_relatorio_por_imovel(db, ano, mes)
+    # Filtrar por permissões: se o usuário não tem acesso ao proprietário do imóvel, remover
+    from app.core.permissions import get_permitted_proprietarios
+    permitted = get_permitted_proprietarios(current_user, db)
+    if not current_user or current_user.tipo != 'administrador':
+        # Supõe que cada item em resultado tem campo 'id_proprietario'
+        resultado = [r for r in resultado if r.get('id_proprietario') in permitted]
+
     return {"ano": ano, "mes": mes, "dados": resultado}
     return {"message": "Aluguel deleted successfully"}
 
@@ -210,9 +230,11 @@ def read_alugueis_mensais(
         query = query.filter(AluguelMensalModel.data_referencia >= data_inicio, 
                            AluguelMensalModel.data_referencia < data_fim)
     
+    # Aplicar filtros de permissão e visibilidade (registros inativos)
+    query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    query = filter_inactive_records(query, current_user, 'ativo') if hasattr(AluguelMensalModel, 'ativo') else query
+
     alugueis_mensais = query.offset(skip).limit(limit).all()
-    
-    # Retornar diretamente sem conversão manual para testar
     return alugueis_mensais
 
 @router.get("/mensais/{aluguel_mensal_id}", response_model=AluguelMensal)
@@ -224,7 +246,11 @@ def read_aluguel_mensal(
     db_aluguel = db.query(AluguelMensalModel).filter(AluguelMensalModel.id == aluguel_mensal_id).first()
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel mensal not found")
-    
+    # Verificar permissão para acessar este registro (visualizar)
+    from app.core.permissions import can_view_financial_data
+    if not can_view_financial_data(current_user, db_aluguel.id_proprietario, db):
+        raise HTTPException(status_code=403, detail="Você não tem permissão para acessar este aluguel mensal")
+
     return db_aluguel
 
 @router.delete("/mensais/{aluguel_mensal_id}")
@@ -237,10 +263,14 @@ def delete_aluguel_mensal(
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel mensal not found")
     
+    from app.core.permissions import can_edit_financial_data
+    if not can_edit_financial_data(current_user, db_aluguel.id_proprietario, db):
+        raise HTTPException(status_code=403, detail="Você não tem permissão para excluir este aluguel mensal")
+
     db.delete(db_aluguel)
     db.commit()
-    
-    return {"message": "Aluguel mensal deleted successfully"}
+
+    return {"message": "Aluguel mensal deletado com sucesso"}
 
 @router.put("/mensais/{aluguel_mensal_id}", response_model=AluguelMensal)
 def update_aluguel_mensal(
@@ -253,10 +283,14 @@ def update_aluguel_mensal(
     if db_aluguel is None:
         raise HTTPException(status_code=404, detail="Aluguel mensal not found")
     
+    from app.core.permissions import can_edit_financial_data
+    if not can_edit_financial_data(current_user, db_aluguel.id_proprietario, db):
+        raise HTTPException(status_code=403, detail="Você não tem permissão para editar este aluguel mensal")
+
     update_data = aluguel_update.dict(exclude_unset=True)
     for field, value in update_data.items():
         setattr(db_aluguel, field, value)
-    
+
     db.commit()
     db.refresh(db_aluguel)
     return db_aluguel

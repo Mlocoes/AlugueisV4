@@ -4,7 +4,8 @@
 class ApiClient {
     constructor() {
         this.baseURL = window.location.origin;
-        this.token = this.getToken();
+    // Com cookies HttpOnly não mantemos token no cliente
+    this.token = null;
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento
         
         // Verificar token periodicamente (a cada 5 minutos)
@@ -14,16 +15,15 @@ class ApiClient {
     }
 
     getToken() {
-        return localStorage.getItem('token') || sessionStorage.getItem('token');
+        // Antigo comportamento: token era armazenado no localStorage/sessionStorage.
+        // Agora usamos cookies HttpOnly, portanto o cliente não pode ler o token.
+        return null;
     }
 
     setToken(token, remember = false) {
-        this.token = token;
-        if (remember) {
-            localStorage.setItem('token', token);
-        } else {
-            sessionStorage.setItem('token', token);
-        }
+        // Antigo comportamento: armazenar token no cliente. Agora usamos cookies HttpOnly,
+        // portanto esta função foi transformada em no-op para evitar salvar tokens no storage.
+        console.warn('setToken chamado, mas a aplicação usa cookies HttpOnly. Nenhuma ação realizada.');
     }
 
     async request(endpoint, options = {}) {
@@ -32,7 +32,9 @@ class ApiClient {
             headers: {
                 ...options.headers
             },
-            ...options
+            ...options,
+            // Enviar cookies (inclui HttpOnly cookies) nas requisições
+            credentials: 'include'
         };
 
         // Não definir Content-Type se for FormData (deixa o fetch definir automaticamente)
@@ -41,11 +43,32 @@ class ApiClient {
         }
 
         if (this.token) {
-            config.headers['Authorization'] = `Bearer ${this.token}`;
+        // Requisições deverão usar cookies para autenticação; não injetamos header Authorization
         }
 
         if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
             config.body = JSON.stringify(config.body);
+        }
+
+        // Adicionar automaticamente o header CSRF para métodos mutantes quando disponível
+        try {
+            const method = (config.method || 'GET').toUpperCase();
+            const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'];
+            if (mutating.includes(method) && !(config.headers && (config.headers['X-CSRF-Token'] || config.headers['x-csrf-token']))) {
+                // Ler cookie csrf_token (não HttpOnly)
+                const getCookie = (name) => {
+                    const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+                    return match ? decodeURIComponent(match.pop()) : null;
+                };
+                const csrf = getCookie('csrf_token');
+                if (csrf) {
+                    config.headers = config.headers || {};
+                    config.headers['X-CSRF-Token'] = csrf;
+                }
+            }
+        } catch (e) {
+            // Em ambientes não DOM (ex: SSR) falhar silenciosamente
+            console.debug('CSRF header injection failed:', e);
         }
 
         const response = await fetch(url, config);
@@ -69,8 +92,10 @@ class ApiClient {
                 }
             }
 
-            const errorData = await response.json().catch(() => ({ message: 'Erro na requisição' }));
-            throw new Error(errorData.message || `Erro ${response.status}: ${response.statusText}`);
+                const errorData = await response.json().catch(() => ({ message: 'Erro na requisição' }));
+                // Preferir 'detail' (FastAPI) o 'message' no corpo do erro
+                const errMsg = errorData.detail || errorData.message || `Erro ${response.status}: ${response.statusText}`;
+                throw new Error(errMsg);
         }
 
         // Para respostas de download, retornar o blob diretamente
@@ -105,6 +130,7 @@ class ApiClient {
         const formBody = Object.keys(details).map(key => 
             encodeURIComponent(key) + '=' + encodeURIComponent(details[key])).join('&');
 
+        // O servidor agora setará um cookie HttpOnly; a resposta JSON é apenas indicativa
         const response = await this.request('/auth/login', {
             method: 'POST',
             headers: {
@@ -112,20 +138,28 @@ class ApiClient {
             },
             body: formBody
         });
-        
         return response;
     }
 
     async logout() {
-        // Logout no JWT é apenas remover o token do lado cliente
-        localStorage.removeItem('token');
-        sessionStorage.removeItem('token');
+        // Para logout, pedir ao backend para limpar cookie e limpar dados locais
+        try {
+            await this.post('/auth/logout');
+        } catch (e) {
+            // ignore
+        }
         localStorage.removeItem('userRole');
         localStorage.removeItem('userName');
         this.token = null;
         this.userRole = null;
         this.userName = null;
-        console.log('Logout realizado - token e dados removidos');
+        console.log('Logout realizado - cookies e dados locais removidos');
+        // Redirecionar para a página de login para limpar a UI
+        try {
+            window.location.href = '/login';
+        } catch (e) {
+            // ignore
+        }
     }
 
     async getCurrentUser() {
@@ -143,6 +177,36 @@ class ApiClient {
             console.error('Erro ao obter usuário atual:', error);
             throw error;
         }
+    }
+
+    async getMyPermissions(force = false) {
+        // Retorna um objeto com arrays: { visualizar: [...ids], editar: [...ids] }
+        if (!force && this._cachedPermissions) return this._cachedPermissions;
+        try {
+            const perms = await this.get('/api/permissoes_financeiras/me');
+            const visualizar = (perms || []).filter(p => p.visualizar).map(p => p.id_proprietario);
+            const editar = (perms || []).filter(p => p.editar).map(p => p.id_proprietario);
+            this._cachedPermissions = { visualizar, editar };
+            return this._cachedPermissions;
+        } catch (e) {
+            console.warn('Não foi possível obter permissões do usuário:', e);
+            this._cachedPermissions = { visualizar: [], editar: [] };
+            return this._cachedPermissions;
+        }
+    }
+
+    canEditProprietario(proprietarioId) {
+        if (this.isAdmin()) return true;
+        const perms = this._cachedPermissions;
+        if (!perms) return false;
+        return (perms.editar || []).includes(proprietarioId);
+    }
+
+    canViewProprietario(proprietarioId) {
+        if (this.isAdmin()) return true;
+        const perms = this._cachedPermissions;
+        if (!perms) return false;
+        return (perms.visualizar || []).includes(proprietarioId);
     }
 
     isAdmin() {
@@ -189,30 +253,13 @@ class ApiClient {
 
     async refreshTokenIfNeeded() {
         // Verificar se o token precisa ser renovado (se faltar menos de 30 minutos para expirar)
-        if (this.token) {
-            try {
-                const payload = JSON.parse(atob(this.token.split('.')[1]));
-                const exp = payload.exp * 1000; // converter para milissegundos
-                const now = Date.now();
-                const timeToExpiry = exp - now;
-                
-                // Se faltar menos de 30 minutos, renovar
-                if (timeToExpiry < 30 * 60 * 1000) {
-                    console.log('Token próximo de expirar, renovando...');
-                    try {
-                        const response = await this.post('/auth/refresh');
-                        if (response.access_token) {
-                            this.setToken(response.access_token, localStorage.getItem('token') !== null);
-                            console.log('Token renovado com sucesso');
-                        }
-                    } catch (error) {
-                        console.error('Erro ao renovar token:', error);
-                        // Se falhar, deixar o fluxo continuar - será tratado pelo erro 401
-                    }
-                }
-            } catch (error) {
-                console.error('Erro ao verificar expiração do token:', error);
-            }
+        // Como o token não é compartilhado com o cliente,
+        // apenas chamamos /auth/refresh periodicamente para que o servidor renove o cookie quando necessário.
+        try {
+            await this.post('/auth/refresh');
+        } catch (error) {
+            // Falhas silenciosas serão tratadas por chamadas que retornarem 401
+            // (não tentar setar header Authorization porque token é HttpOnly)
         }
     }
 }
@@ -413,12 +460,66 @@ document.addEventListener('DOMContentLoaded', function() {
     window.dispatchEvent(new CustomEvent('apiReady', { detail: window.apiClient }));
 
     // Mobile menu toggle
-    const mobileMenuButton = document.querySelector('[aria-controls="mobile-menu"]');
+    const mobileMenuButton = document.querySelector('#mobile-menu-button');
     const mobileMenu = document.getElementById('mobile-menu');
 
     if (mobileMenuButton && mobileMenu) {
         mobileMenuButton.addEventListener('click', function() {
+            const isExpanded = mobileMenuButton.getAttribute('aria-expanded') === 'true';
+            mobileMenuButton.setAttribute('aria-expanded', !isExpanded);
             mobileMenu.classList.toggle('hidden');
+
+            // Change icon based on state
+            const icon = mobileMenuButton.querySelector('i');
+            if (icon) {
+                icon.className = isExpanded ? 'fas fa-bars text-xl' : 'fas fa-times text-xl';
+            }
+        });
+
+        // Close mobile menu when clicking on a link
+        mobileMenu.addEventListener('click', function(e) {
+            if (e.target.tagName === 'A') {
+                mobileMenu.classList.add('hidden');
+                mobileMenuButton.setAttribute('aria-expanded', 'false');
+                const icon = mobileMenuButton.querySelector('i');
+                if (icon) {
+                    icon.className = 'fas fa-bars text-xl';
+                }
+            }
+        });
+    }
+
+    // Update user info in mobile menu
+    function updateUserInfo() {
+        const userInfo = document.getElementById('user-info');
+        const userInfoMobile = document.getElementById('user-info-mobile');
+
+        if (window.apiClient && window.apiClient.token) {
+            // Decode JWT token to get user info
+            try {
+                const payload = JSON.parse(atob(window.apiClient.token.split('.')[1]));
+                const username = payload.sub || 'Usuário';
+
+                if (userInfo) userInfo.textContent = `Olá, ${username}`;
+                if (userInfoMobile) userInfoMobile.textContent = `Olá, ${username}`;
+            } catch (e) {
+                console.warn('Erro ao decodificar token:', e);
+                if (userInfo) userInfo.textContent = 'Usuário';
+                if (userInfoMobile) userInfoMobile.textContent = 'Usuário';
+            }
+        }
+    }
+
+    // Update user info when API is ready
+    window.addEventListener('apiReady', updateUserInfo);
+
+    // Logout functionality for mobile
+    const logoutBtnMobile = document.getElementById('logout-btn-mobile');
+    if (logoutBtnMobile) {
+        logoutBtnMobile.addEventListener('click', function() {
+            localStorage.removeItem('token');
+            sessionStorage.removeItem('token');
+            window.location.href = '/login';
         });
     }
 });

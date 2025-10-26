@@ -5,7 +5,8 @@ from os import getenv
 
 class Settings(BaseSettings):
     database_url: str = getenv("DATABASE_URL", "postgresql://alugueis_user:alugueis_password@localhost:5432/alugueis")
-    secret_key: str = getenv("SECRET_KEY", "your-secret-key-here")
+    # NOTE: do not leave a default secret_key for production
+    secret_key: str = getenv("SECRET_KEY", None)
     algorithm: str = "HS256"
     access_token_expire_minutes: int = 480
     allowed_origins: list[str] = ["*"]
@@ -15,3 +16,20 @@ class Settings(BaseSettings):
         extra = 'ignore'
 
 settings = Settings()
+# Runtime environment
+APP_ENV = getenv("APP_ENV", "development").lower()
+
+# Safety checks
+insecure_secrets = (settings.secret_key is None or settings.secret_key in ("your-secret-key-here", "changeme", ""))
+if APP_ENV == 'production':
+    # In production fail fast on insecure configuration
+    if insecure_secrets:
+        raise RuntimeError("SECRET_KEY is not set or is insecure. Set SECRET_KEY environment variable before starting the application in production.")
+    if settings.allowed_origins == ["*"]:
+        raise RuntimeError("allowed_origins is set to wildcard '*'. Configure ALLOWED_ORIGINS appropriately for production.")
+else:
+    # Development: warn but don't stop
+    if insecure_secrets:
+        print("WARNING: SECRET_KEY is not set or insecure. Set environment variable SECRET_KEY for production deployments.")
+    if settings.allowed_origins == ["*"]:
+        print("WARNING: allowed_origins is set to wildcard '*'. Restrict allowed_origins in production.")

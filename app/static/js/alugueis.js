@@ -25,6 +25,8 @@ class AlugueisManager {
         await this.checkAuth();
         this.setupEventListeners();
         await this.loadData();
+        // Obter permissões do usuário para controlar permissões por proprietário
+        this.permissions = await this.apiClient.getMyPermissions();
         
         // Controle de acesso baseado em papel
         utils.hideElementsForNonAdmin(this.apiClient);
@@ -40,22 +42,11 @@ class AlugueisManager {
                 // Tentar login com credenciais de teste
                 const formData = new FormData();
                 formData.append('username', 'admin');
-                formData.append('password', '123');
+                formData.append('password', 'admin123');
 
-                const response = await fetch('/auth/login', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Login automático bem-sucedido');
-                    this.apiClient.setToken(data.access_token);
-                    await this.apiClient.getCurrentUser();
-                } else {
-                    console.log('Login automático falhou, redirecionando para login');
-                    window.location.href = '/login';
-                }
+                const response = await this.apiClient.login('admin', 'admin123');
+                console.log('Login automático bem-sucedido');
+                await this.apiClient.getCurrentUser();
             } catch (loginError) {
                 console.log('Erro no login automático, redirecionando para login');
                 window.location.href = '/login';
@@ -175,7 +166,7 @@ class AlugueisManager {
             });
 
             const isAdmin = this.apiClient.isAdmin();
-
+            const canEditSet = new Set((this.permissions && this.permissions.editar) || []);
             this.alugueisTable = new Handsontable(container, {
                 data: data,
                 colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Data Ref.', 'Valor Total', 'Valor Prop.', 'Taxa Admin', 'Ações'],
@@ -228,19 +219,29 @@ class AlugueisManager {
                         type: 'text',
                         readOnly: true,
                         renderer: function(instance, td, row, col, prop, value, cellProperties) {
-                            const aluguelId = instance.getDataAtRow(row)[0];
-                            if (isAdmin) {
-                                td.innerHTML = `
-                                    <button class="text-red-600 hover:text-red-800 text-sm" onclick="alugueisManager.deleteAluguel(${aluguelId})">
-                                        <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
-                                        </svg>
-                                    </button>
-                                `;
-                            } else {
-                                td.innerHTML = '-';
+                                const rowData = instance.getDataAtRow(row);
+                                const aluguelId = rowData[0];
+                                const proprietarioId = rowData[2] && typeof rowData[2] === 'number' ? rowData[2] : null;
+                                // proprietarioId may not be numeric in this table; fall back to lookup in manager
+                                let ownerId = proprietarioId;
+                                if (!ownerId) {
+                                    const aluguel = alugueisManager.alugueisData.find(a => a.id === aluguelId);
+                                    ownerId = aluguel ? aluguel.id_proprietario : null;
+                                }
+
+                                const canEdit = isAdmin || (ownerId !== null && canEditSet.has(ownerId));
+                                if (canEdit) {
+                                    td.innerHTML = `
+                                        <button class="text-red-600 hover:text-red-800 text-sm" onclick="alugueisManager.deleteAluguel(${aluguelId})">
+                                            <svg class="w-4 h-4 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                            </svg>
+                                        </button>
+                                    `;
+                                } else {
+                                    td.innerHTML = '-';
+                                }
                             }
-                        }
                     } // Ações
                 ],
                 height: 500,
@@ -252,13 +253,26 @@ class AlugueisManager {
                         this.handleCellChange(changes);
                     }
                 },
-                cells: function(row, col) {
-                    const cellProperties = {};
-                    if (!isAdmin && col !== 0 && col !== 1 && col !== 6) {
-                        cellProperties.className = 'htDimmed';
+                    // Controlar readOnly por célula com base em permissão por proprietário
+                    cells: function(row, col) {
+                        const cellProperties = {};
+                        // Colunas editáveis são 2..7 (exceto ID coluna 0)
+                        if (!isAdmin && col >= 2 && col <= 7) {
+                            const rowData = this.instance.getDataAtRow(row);
+                            let ownerId = null;
+                            if (rowData) {
+                                const aluguelId = rowData[0];
+                                const aluguel = alugueisManager.alugueisData.find(a => a.id === aluguelId);
+                                if (aluguel) ownerId = aluguel.id_proprietario;
+                            }
+                            const canEdit = ownerId !== null && canEditSet.has(ownerId);
+                            if (!canEdit) {
+                                cellProperties.readOnly = true;
+                                cellProperties.className = (cellProperties.className || '') + ' htDimmed';
+                            }
+                        }
+                        return cellProperties;
                     }
-                    return cellProperties;
-                }
             });
 
         } catch (error) {

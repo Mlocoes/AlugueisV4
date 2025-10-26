@@ -40,22 +40,13 @@ class AdministracaoManager {
                 // Tentar login com credenciais de teste
                 const formData = new FormData();
                 formData.append('username', 'admin');
-                formData.append('password', '123');
+                formData.append('password', 'admin123');
 
-                const response = await fetch('/auth/login', {
-                    method: 'POST',
-                    body: formData
-                });
+                    const response = await this.apiClient.login('admin', 'admin123');
 
-                if (response.ok) {
-                    const data = await response.json();
+                    // Se a chamada não lançar exceção, consideramos o login bem-sucedido
                     console.log('Login automático bem-sucedido');
-                    this.apiClient.setToken(data.access_token);
                     await this.apiClient.getCurrentUser();
-                } else {
-                    console.log('Login automático falhou, redirecionando para login');
-                    window.location.href = '/login';
-                }
             } catch (loginError) {
                 console.log('Erro no login automático, redirecionando para login');
                 window.location.href = '/login';
@@ -68,12 +59,31 @@ class AdministracaoManager {
 
         // Abas
         document.getElementById('tab-usuarios').addEventListener('click', () => this.showTab('usuarios'));
+    document.getElementById('tab-permissoes').addEventListener('click', () => this.showTab('permissoes'));
         document.getElementById('tab-backup').addEventListener('click', () => this.showTab('backup'));
         document.getElementById('tab-config').addEventListener('click', () => this.showTab('config'));
         document.getElementById('tab-logs').addEventListener('click', () => this.showTab('logs'));
 
         // Usuários
         document.getElementById('add-user-btn').addEventListener('click', () => this.showUserModal());
+    const addPermBtn = document.getElementById('add-perm-btn');
+    if (addPermBtn) addPermBtn.addEventListener('click', () => this.showPermModal());
+
+    // Perm modal listeners
+    const closePermBtn = document.getElementById('close-perm-modal-btn');
+    if (closePermBtn) closePermBtn.addEventListener('click', () => this.hidePermModal());
+    const cancelPermBtn = document.getElementById('cancel-perm-btn');
+    if (cancelPermBtn) cancelPermBtn.addEventListener('click', () => this.hidePermModal());
+    document.getElementById('perm-form').addEventListener('submit', (e) => this.savePerm(e));
+
+    // Autocomplete searches
+    const userSearch = document.getElementById('perm-user-search');
+    const userList = document.getElementById('perm-user-list');
+    if (userSearch) userSearch.addEventListener('input', (e) => this.searchUsers(e.target.value, userList, 'perm-user-id', 'perm-user-search'));
+
+    const propSearch = document.getElementById('perm-prop-search');
+    const propList = document.getElementById('perm-prop-list');
+    if (propSearch) propSearch.addEventListener('input', (e) => this.searchProprietarios(e.target.value, propList, 'perm-prop-id', 'perm-prop-search'));
         document.getElementById('close-user-modal-btn').addEventListener('click', () => this.hideUserModal());
         document.getElementById('cancel-user-btn').addEventListener('click', () => this.hideUserModal());
         document.getElementById('user-form').addEventListener('submit', (e) => this.saveUser(e));
@@ -126,6 +136,9 @@ class AdministracaoManager {
         switch (tabName) {
             case 'usuarios':
                 await this.loadUsuarios();
+                break;
+            case 'permissoes':
+                await this.loadPermissoes();
                 break;
             case 'backup':
                 await this.loadBackupHistory();
@@ -202,6 +215,256 @@ class AdministracaoManager {
         } catch (error) {
             console.error('Erro ao carregar usuários:', error);
         }
+    }
+
+    // Permissões
+    async loadPermissoes() {
+        try {
+            const perms = await this.apiClient.get('/api/permissoes_financeiras/');
+
+            const container = document.getElementById('permissoes-table');
+
+            if (this.permissoesTable) {
+                this.permissoesTable.destroy();
+            }
+
+            const data = perms.map(p => [p.id, p.id_usuario, p.id_proprietario, p.visualizar ? 'Sim' : 'Não', p.editar ? 'Sim' : 'Não', 'Editar | Excluir']);
+
+            this.permissoesTable = new Handsontable(container, {
+                data: data,
+                colHeaders: ['ID', 'ID Usuário', 'ID Proprietário', 'Visualizar', 'Editar', 'Ações'],
+                columns: [
+                    { type: 'text', readOnly: true },
+                    { type: 'text' },
+                    { type: 'text' },
+                    { type: 'text', readOnly: true },
+                    { type: 'text', readOnly: true },
+                    {
+                        type: 'text',
+                        readOnly: true,
+                        renderer: function(instance, td, row, col, prop, value, cellProperties) {
+                            const permId = instance.getDataAtRow(row)[0];
+                            td.innerHTML = `
+                                <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="administracaoManager.editPerm(${permId})">Editar</button>
+                                <button class="text-red-600 hover:text-red-800" onclick="administracaoManager.deletePerm(${permId})">Excluir</button>
+                            `;
+                        }
+                    }
+                ],
+                height: 300,
+                readOnly: true,
+                stretchH: 'all',
+                licenseKey: 'non-commercial-and-evaluation'
+            });
+
+        } catch (error) {
+            console.error('Erro ao carregar permissões:', error);
+        }
+    }
+
+    editPerm(id) {
+        // Abrir modal de edição - simplificado: redirecionar para admin page ou usar prompt
+        const newVisualizar = confirm('Deseja ativar a permissão de visualizar? OK=Sim, Cancel=Nao');
+        const newEditar = confirm('Deseja ativar a permissão de editar? OK=Sim, Cancel=Nao');
+
+        this.apiClient.put(`/api/permissoes_financeiras/${id}`, { visualizar: newVisualizar, editar: newEditar })
+            .then(() => { this.loadPermissoes(); alert('Permissão atualizada'); })
+            .catch(err => { console.error(err); alert('Erro ao atualizar permissão'); });
+    }
+
+    async deletePerm(id) {
+        if (!confirm('Tem certeza que deseja excluir esta permissão?')) return;
+        try {
+            await this.apiClient.delete(`/api/permissoes_financeiras/${id}`);
+            await this.loadPermissoes();
+            alert('Permissão excluída');
+        } catch (error) {
+            console.error('Erro ao excluir permissão:', error);
+            alert('Erro ao excluir permissão.');
+        }
+    }
+
+    // Handler simplificado para criar nova permissão
+    async createPerm() {
+        const id_usuario = parseInt(prompt('ID do usuário:', ''), 10);
+        const id_proprietario = parseInt(prompt('ID do proprietário:', ''), 10);
+        if (!id_usuario || !id_proprietario) { alert('IDs inválidos'); return; }
+
+        try {
+            await this.apiClient.post('/api/permissoes_financeiras/', { id_usuario, id_proprietario, visualizar: true, editar: false });
+            await this.loadPermissoes();
+            alert('Permissão criada');
+        } catch (error) {
+            console.error('Erro ao criar permissão:', error);
+            alert('Erro ao criar permissão.');
+        }
+    }
+
+    showPermModal(existing = null) {
+        const modal = document.getElementById('perm-modal');
+        const form = document.getElementById('perm-form');
+
+        form.reset();
+        document.getElementById('perm-user-id').value = '';
+        document.getElementById('perm-prop-id').value = '';
+        document.getElementById('perm-user-list').classList.add('hidden');
+        document.getElementById('perm-prop-list').classList.add('hidden');
+
+        if (existing) {
+            document.getElementById('perm-id').value = existing.id;
+            document.getElementById('perm-user-id').value = existing.id_usuario;
+            document.getElementById('perm-prop-id').value = existing.id_proprietario;
+            document.getElementById('perm-visualizar').checked = existing.visualizar;
+            document.getElementById('perm-editar').checked = existing.editar;
+            document.getElementById('perm-user-search').value = existing.usuario_nome || '';
+            document.getElementById('perm-prop-search').value = existing.proprietario_nome || '';
+            document.getElementById('perm-modal-title').textContent = 'Editar Permissão';
+        } else {
+            document.getElementById('perm-modal-title').textContent = 'Nova Permissão';
+        }
+
+        modal.classList.remove('hidden');
+    }
+
+    hidePermModal() {
+        const modal = document.getElementById('perm-modal');
+        modal.classList.add('hidden');
+    }
+
+    async searchUsers(query, container, hiddenFieldId, inputId) {
+        if (!query || query.length < 2) {
+            container.classList.add('hidden');
+            container.innerHTML = '';
+            return;
+        }
+
+        try {
+            const users = await this.apiClient.get(`/api/usuarios/?q=${encodeURIComponent(query)}&limit=10`);
+            container.innerHTML = '';
+            if (!users || users.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            users.forEach(u => {
+                const item = document.createElement('div');
+                item.className = 'p-2 hover:bg-gray-100 cursor-pointer';
+                item.textContent = `${u.nome} (${u.email})`;
+                item.addEventListener('click', () => {
+                    document.getElementById(hiddenFieldId).value = u.id;
+                    document.getElementById(inputId).value = `${u.nome} (${u.email})`;
+                    container.classList.add('hidden');
+                });
+                container.appendChild(item);
+            });
+            container.classList.remove('hidden');
+        } catch (error) {
+            console.error('Erro buscando usuários:', error);
+            container.classList.add('hidden');
+        }
+    }
+
+    async searchProprietarios(query, container, hiddenFieldId, inputId) {
+        if (!query || query.length < 2) {
+            container.classList.add('hidden');
+            container.innerHTML = '';
+            return;
+        }
+
+        try {
+            const props = await this.apiClient.get(`/api/usuarios/?q=${encodeURIComponent(query)}&tipo=usuario&limit=10`);
+            container.innerHTML = '';
+            if (!props || props.length === 0) {
+                container.classList.add('hidden');
+                return;
+            }
+            props.forEach(p => {
+                const item = document.createElement('div');
+                item.className = 'p-2 hover:bg-gray-100 cursor-pointer';
+                item.textContent = `${p.nome} (${p.email})`;
+                item.addEventListener('click', () => {
+                    document.getElementById(hiddenFieldId).value = p.id;
+                    document.getElementById(inputId).value = `${p.nome} (${p.email})`;
+                    container.classList.add('hidden');
+                });
+                container.appendChild(item);
+            });
+            container.classList.remove('hidden');
+        } catch (error) {
+            console.error('Erro buscando proprietários:', error);
+            container.classList.add('hidden');
+        }
+    }
+
+    async savePerm(event) {
+        event.preventDefault();
+        const id = document.getElementById('perm-id').value;
+        const id_usuario = parseInt(document.getElementById('perm-user-id').value, 10);
+        const id_proprietario = parseInt(document.getElementById('perm-prop-id').value, 10);
+        const visualizar = document.getElementById('perm-visualizar').checked;
+        const editar = document.getElementById('perm-editar').checked;
+
+        if (!id_usuario || !id_proprietario) {
+            // Mostrar mensaje inline
+            this.showPermError('Selecione usuário e proprietário válidos.');
+            return;
+        }
+
+        try {
+            if (id) {
+                await this.apiClient.put(`/api/permissoes_financeiras/${id}`, { visualizar, editar });
+            } else {
+                await this.apiClient.post('/api/permissoes_financeiras/', { id_usuario, id_proprietario, visualizar, editar });
+            }
+
+            this.hidePermModal();
+            await this.loadPermissoes();
+            // Opcional: mostrar notificación
+            utils.showAlert('Permissão salva com sucesso', 'success');
+        } catch (error) {
+            console.error('Erro ao salvar permissão:', error);
+            // Si es conflicto (409), mostrar mensaje inline y ofrecer editar
+            const msg = error.message || String(error);
+            if (msg.toLowerCase().includes('já existe') || msg.toLowerCase().includes('ja existe') || msg.toLowerCase().includes('conflict')) {
+                this.showPermError('Permissão já existe para este usuário/proprietário. Você deseja editar a permissão existente? <a href="#" id="perm-edit-existing">Editar</a>');
+                // Añadir listener para enlace de editar
+                setTimeout(() => {
+                    const link = document.getElementById('perm-edit-existing');
+                    if (link) {
+                        link.addEventListener('click', async (e) => {
+                            e.preventDefault();
+                            // Buscar la permissão existente (buscar por usuario+proprietario)
+                            try {
+                                const perms = await this.apiClient.get(`/api/permissoes_financeiras/?q=&skip=0&limit=200`);
+                                const found = perms.find(p => p.id_usuario === id_usuario && p.id_proprietario === id_proprietario);
+                                if (found) {
+                                    this.showPermModal(found);
+                                } else {
+                                    this.showPermError('Permissão existente não encontrada.');
+                                }
+                            } catch (err) {
+                                console.error('Erro buscando permissão existente:', err);
+                                this.showPermError('Erro ao buscar permissão existente.');
+                            }
+                        });
+                    }
+                }, 50);
+                return;
+            }
+
+            this.showPermError('Erro ao salvar permissão. ' + msg);
+        }
+    }
+
+    showPermError(message) {
+        let container = document.getElementById('perm-error');
+        if (!container) {
+            const form = document.getElementById('perm-form');
+            container = document.createElement('div');
+            container.id = 'perm-error';
+            container.className = 'text-sm text-red-600 mt-2';
+            form.insertBefore(container, form.firstChild);
+        }
+        container.innerHTML = message;
     }
 
     showUserModal(user = null) {

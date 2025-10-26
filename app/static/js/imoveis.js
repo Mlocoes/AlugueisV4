@@ -36,22 +36,11 @@ class ImoveisManager {
                 // Tentar login com credenciais de teste
                 const formData = new FormData();
                 formData.append('username', 'admin');
-                formData.append('password', 'admin00');
+                formData.append('password', 'admin123');
 
-                const response = await fetch('/auth/login', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log('Login automático bem-sucedido');
-                    this.apiClient.setToken(data.access_token);
-                    await this.apiClient.getCurrentUser();
-                } else {
-                    console.log('Login automático falhou, redirecionando para login');
-                    window.location.href = '/login';
-                }
+                const response = await this.apiClient.login('admin', 'admin123');
+                console.log('Login automático bem-sucedido');
+                await this.apiClient.getCurrentUser();
             } catch (loginError) {
                 console.log('Erro no login automático, redirecionando para login');
                 window.location.href = '/login';
