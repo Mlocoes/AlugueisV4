@@ -35,22 +35,9 @@ class AdministracaoManager {
         try {
             await this.apiClient.getCurrentUser();
         } catch (error) {
-            console.log('Tentando login automático...');
-            try {
-                // Tentar login com credenciais de teste
-                const formData = new FormData();
-                formData.append('username', 'admin');
-                formData.append('password', 'admin123');
-
-                    const response = await this.apiClient.login('admin', 'admin123');
-
-                    // Se a chamada não lançar exceção, consideramos o login bem-sucedido
-                    console.log('Login automático bem-sucedido');
-                    await this.apiClient.getCurrentUser();
-            } catch (loginError) {
-                console.log('Erro no login automático, redirecionando para login');
-                window.location.href = '/login';
-            }
+            // Sempre redirecionar para a tela de login ao carregar a página quando não autenticado
+            window.location.href = '/login';
+            return;
         }
     }
 
@@ -167,7 +154,8 @@ class AdministracaoManager {
                 user.id,
                 user.nome,
                 user.email,
-                user.role,
+                // Usar 'tipo' (backend) ou alias 'papel'
+                user.tipo || user.papel || 'usuario',
                 user.ativo ? 'Ativo' : 'Inativo',
                 'Editar | Excluir'
             ]);
@@ -473,12 +461,13 @@ class AdministracaoManager {
         const form = document.getElementById('user-form');
         const title = document.getElementById('user-modal-title');
 
-        if (user) {
+            if (user) {
             title.textContent = 'Editar Usuário';
             form['id'].value = user.id;
             form['user-nome'].value = user.nome;
             form['user-email'].value = user.email;
-            form['user-role'].value = user.role;
+            // Preencher campo de tipo/função com o valor vindo do backend
+            form['user-tipo'].value = user.tipo || user.papel || 'usuario';
             form['user-status'].value = user.ativo ? 'ativo' : 'inativo';
             document.getElementById('user-change-password').checked = false;
             this.togglePasswordFields(false);
@@ -523,7 +512,8 @@ class AdministracaoManager {
         const userData = {
             nome: formData.get('nome'),
             email: formData.get('email'),
-            role: formData.get('role'),
+            // Enviar 'tipo' conforme schema do backend
+            tipo: formData.get('tipo'),
             ativo: formData.get('status') === 'ativo'
         };
 

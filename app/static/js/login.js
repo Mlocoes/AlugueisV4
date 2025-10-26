@@ -84,11 +84,30 @@ class LoginManager {
 
             // O servidor definiu o cookie HttpOnly com o token; nós não podemos ler o token.
             // Salvar apenas informações de UX (se houver) e redirecionar.
-            try {
-                await this.apiClient.getCurrentUser();
-            } catch (e) {
-                // Não bloquear o redirecionamento se falhar
+            // Limpar possíveis valores antigos
+            localStorage.removeItem('userRole');
+            localStorage.removeItem('userName');
+
+            // Tentar obter /auth/me com retries curtos (o cookie é setado pelo servidor na resposta anterior)
+            let gotUser = false;
+            for (let i = 0; i < 3; i++) {
+                try {
+                    await this.apiClient.getCurrentUser();
+                    gotUser = true;
+                    break;
+                } catch (e) {
+                    // esperar um pouco antes de tentar novamente
+                    await new Promise(r => setTimeout(r, 200));
+                }
             }
+
+            if (!gotUser) {
+                // Como fallback, redirecionar para login para forçar nova autenticação manual
+                window.location.href = '/login';
+                return;
+            }
+
+            // Se conseguiu obter usuário, redirecionar para raiz
             window.location.href = '/';
 
         } catch (error) {

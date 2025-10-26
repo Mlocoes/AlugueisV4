@@ -27,20 +27,9 @@ class RelatoriosManager {
         try {
             await this.apiClient.getCurrentUser();
         } catch (error) {
-            console.log('Tentando login automático...');
-            try {
-                // Tentar login com credenciais de teste
-                const formData = new FormData();
-                formData.append('username', 'admin');
-                formData.append('password', 'admin123');
-
-                const response = await this.apiClient.login('admin', 'admin123');
-                console.log('Login automático bem-sucedido');
-                await this.apiClient.getCurrentUser();
-            } catch (loginError) {
-                console.log('Erro no login automático, redirecionando para login');
-                window.location.href = '/login';
-            }
+            // Sempre redirecionar para a tela de login ao carregar a página quando não autenticado
+            window.location.href = '/login';
+            return;
         }
     }
 
