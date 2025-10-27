@@ -15,12 +15,27 @@ router = APIRouter()
 def read_alugueis(
     skip: int = 0,
     limit: int = 100,
+    q: str = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
     # Aplicar filtros de permissão financeira
     query = db.query(AluguelModel)
     query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    # Filtro por busca
+    if q:
+        from app.models.imovel import Imovel
+        from app.models.usuario import Usuario
+        search_term = f"%{q}%"
+        query = query.join(Imovel, AluguelModel.id_imovel == Imovel.id)\
+                     .join(Usuario, AluguelModel.id_proprietario == Usuario.id)\
+                     .filter(
+                         (Imovel.endereco.ilike(search_term)) |
+                         (Imovel.nome.ilike(search_term)) |
+                         (Usuario.nome.ilike(search_term)) |
+                         (Usuario.email.ilike(search_term))
+                     )
     
     alugueis = query.offset(skip).limit(limit).all()
     return alugueis

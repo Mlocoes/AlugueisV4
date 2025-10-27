@@ -45,6 +45,19 @@
                         <a href="/importacao" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors">Importação</a>
                         <a href="/administracao" class="px-3 py-2 rounded-md text-sm font-medium hover:bg-gray-100 transition-colors">Administração</a>
                         <div class="flex items-center ml-4">
+                            <!-- Busca Global -->
+                            <div class="relative mr-4">
+                                <div class="flex items-center">
+                                    <input type="text" id="global-search" placeholder="Buscar em todo o sistema..." class="w-64 px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <button id="global-search-btn" class="ml-2 bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-md text-sm font-medium transition-colors">
+                                        <i class="fas fa-search"></i>
+                                    </button>
+                                </div>
+                                <!-- Resultados da busca -->
+                                <div id="global-search-results" class="absolute top-full mt-1 w-full bg-white border border-gray-300 rounded-md shadow-lg z-50 hidden max-h-96 overflow-y-auto">
+                                    <div id="search-results-content"></div>
+                                </div>
+                            </div>
                             <span class="text-sm mr-4" id="user-info">Carregando...</span>
                             <button id="logout-btn" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-md text-sm font-medium transition-colors">
                                 <i class="fas fa-sign-out-alt mr-2"></i>Sair
@@ -99,6 +112,8 @@
     <script src="/static/js/main.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/handsontable@12.3.0/dist/handsontable.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    {% block extra_scripts %}{% endblock %}
+    {% block extra_scripts %}
+    <script src="/static/js/global_search.js"></script>
+    {% endblock %}
 </body>
 </html>

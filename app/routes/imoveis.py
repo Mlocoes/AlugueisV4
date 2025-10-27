@@ -15,12 +15,22 @@ router = APIRouter()
 def read_imoveis(
     skip: int = 0,
     limit: int = 100,
+    q: str = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
     # Aplicar filtros de permissão
     query = db.query(ImovelModel)
     query = filter_inactive_records(query, current_user)
+    
+    # Filtro por busca
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (ImovelModel.endereco.ilike(search_term)) |
+            (ImovelModel.nome.ilike(search_term)) |
+            (ImovelModel.tipo.ilike(search_term))
+        )
     
     imoveis = query.offset(skip).limit(limit).all()
     

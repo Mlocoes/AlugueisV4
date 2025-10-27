@@ -15,6 +15,7 @@ router = APIRouter()
 def read_participacoes(
     skip: int = 0,
     limit: int = 100,
+    q: str = None,
     imovel_id: int = None,
     proprietario_id: int = None,
     created_at_de: str = None,
@@ -25,6 +26,20 @@ def read_participacoes(
     # Aplicar filtros de permissão financeira
     query = db.query(ParticipacaoModel)
     query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    # Filtro por busca
+    if q:
+        from app.models.imovel import Imovel
+        from app.models.usuario import Usuario
+        search_term = f"%{q}%"
+        query = query.join(Imovel, ParticipacaoModel.id_imovel == Imovel.id)\
+                     .join(Usuario, ParticipacaoModel.id_proprietario == Usuario.id)\
+                     .filter(
+                         (Imovel.endereco.ilike(search_term)) |
+                         (Imovel.nome.ilike(search_term)) |
+                         (Usuario.nome.ilike(search_term)) |
+                         (Usuario.email.ilike(search_term))
+                     )
     
     # Filtro por imóvel
     if imovel_id:
