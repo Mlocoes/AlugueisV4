@@ -151,18 +151,48 @@ class DashboardManager {
                     data: values,
                     borderColor: 'rgb(59, 130, 246)',
                     backgroundColor: 'rgba(59, 130, 246, 0.1)',
-                    tension: 0.1
+                    tension: 0.4,
+                    fill: true,
+                    pointBackgroundColor: 'rgb(59, 130, 246)',
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 2,
+                    pointRadius: 6,
+                    pointHoverRadius: 8
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
                     },
                     title: {
                         display: true,
-                        text: 'Receita Mensal'
+                        text: 'Evolução da Receita Mensal',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        padding: 20
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(context) {
+                                return 'Receita: R$ ' + context.parsed.y.toLocaleString('pt-BR', { minimumFractionDigits: 2 });
+                            }
+                        }
                     }
                 },
                 scales: {
@@ -171,9 +201,29 @@ class DashboardManager {
                         ticks: {
                             callback: function(value) {
                                 return 'R$ ' + value.toLocaleString('pt-BR');
+                            },
+                            font: {
+                                size: 11
                             }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
                         }
                     }
+                },
+                interaction: {
+                    intersect: false,
+                    mode: 'index'
                 }
             }
         });
@@ -203,25 +253,81 @@ class DashboardManager {
                 datasets: [{
                     label: 'Quantidade',
                     data: values,
-                    backgroundColor: 'rgb(16, 185, 129)',
-                    borderColor: 'rgb(5, 150, 105)',
-                    borderWidth: 2
+                    backgroundColor: [
+                        'rgba(239, 68, 68, 0.8)',  // Vermelho para Alugado
+                        'rgba(34, 197, 94, 0.8)',  // Verde para Disponível
+                        'rgba(251, 191, 36, 0.8)'  // Amarelo para Manutenção
+                    ],
+                    borderColor: [
+                        'rgb(239, 68, 68)',
+                        'rgb(34, 197, 94)',
+                        'rgb(251, 191, 36)'
+                    ],
+                    borderWidth: 2,
+                    borderRadius: 8,
+                    borderSkipped: false,
+                    barThickness: 60,
+                    maxBarThickness: 80
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'top',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
                     },
                     title: {
                         display: true,
-                        text: 'Status dos Imóveis'
+                        text: 'Status dos Imóveis',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        padding: 20
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(context) {
+                                return context.dataset.label + ': ' + context.parsed.y + ' imóveis';
+                            }
+                        }
                     }
                 },
                 scales: {
                     y: {
-                        beginAtZero: true
+                        beginAtZero: true,
+                        ticks: {
+                            stepSize: 1,
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
+                        }
+                    },
+                    x: {
+                        ticks: {
+                            font: {
+                                size: 11,
+                                weight: 'bold'
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
                     }
                 }
             }
@@ -246,32 +352,63 @@ class DashboardManager {
         const values = data.map(item => item.quantidade || 0);
 
         this.tiposImoveisChart = new Chart(ctx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
                 labels: labels,
                 datasets: [{
                     label: 'Quantidade',
                     data: values,
                     backgroundColor: [
-                        'rgb(59, 130, 246)',
-                        'rgb(16, 185, 129)',
-                        'rgb(245, 158, 11)',
-                        'rgb(239, 68, 68)',
-                        'rgb(139, 92, 246)'
+                        'rgba(59, 130, 246, 0.8)',
+                        'rgba(16, 185, 129, 0.8)',
+                        'rgba(245, 158, 11, 0.8)',
+                        'rgba(239, 68, 68, 0.8)',
+                        'rgba(139, 92, 246, 0.8)',
+                        'rgba(236, 72, 153, 0.8)',
+                        'rgba(6, 182, 212, 0.8)'
                     ],
                     borderColor: 'rgb(255, 255, 255)',
-                    borderWidth: 2
+                    borderWidth: 3,
+                    hoverBorderWidth: 4,
+                    hoverBorderColor: 'rgb(255, 255, 255)',
+                    cutout: '60%'
                 }]
             },
             options: {
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
                         position: 'right',
+                        labels: {
+                            usePointStyle: true,
+                            padding: 20,
+                            font: {
+                                size: 12,
+                                weight: 'bold'
+                            }
+                        }
                     },
                     title: {
                         display: true,
-                        text: 'Distribuição por Tipo de Imóvel'
+                        text: 'Distribuição por Tipo de Imóvel',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        padding: 20
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(context) {
+                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                const percentage = ((context.parsed / total) * 100).toFixed(1);
+                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
+                            }
+                        }
                     }
                 }
             }
@@ -295,6 +432,11 @@ class DashboardManager {
         const labels = data.map(item => item.proprietario || 'N/A');
         const values = data.map(item => item.receita_total || 0);
 
+        // Criar gradiente para as barras
+        const gradient = ctx.createLinearGradient(0, 0, 400, 0);
+        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
+        gradient.addColorStop(1, 'rgba(5, 150, 105, 0.8)');
+
         this.receitaProprietariosChart = new Chart(ctx, {
             type: 'bar',
             data: {
@@ -302,30 +444,73 @@ class DashboardManager {
                 datasets: [{
                     label: 'Receita Total (R$)',
                     data: values,
-                    backgroundColor: 'rgb(59, 130, 246)',
-                    borderColor: 'rgb(37, 99, 235)',
-                    borderWidth: 2
+                    backgroundColor: gradient,
+                    borderColor: 'rgb(5, 150, 105)',
+                    borderWidth: 2,
+                    borderRadius: 6,
+                    borderSkipped: false,
                 }]
             },
             options: {
+                indexAxis: 'y', // Gráfico horizontal
                 responsive: true,
+                maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        position: 'top',
+                        display: false, // Ocultar legenda para economia de espaço
                     },
                     title: {
                         display: true,
-                        text: 'Receita por Proprietário'
+                        text: 'Top 10 Proprietários por Receita',
+                        font: {
+                            size: 16,
+                            weight: 'bold'
+                        },
+                        padding: {
+                            top: 10,
+                            bottom: 20
+                        }
+                    },
+                    tooltip: {
+                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                        titleColor: '#fff',
+                        bodyColor: '#fff',
+                        callbacks: {
+                            label: function(context) {
+                                return 'Receita: R$ ' + context.parsed.x.toLocaleString('pt-BR');
+                            }
+                        }
                     }
                 },
                 scales: {
-                    y: {
+                    x: {
                         beginAtZero: true,
                         ticks: {
                             callback: function(value) {
                                 return 'R$ ' + value.toLocaleString('pt-BR');
+                            },
+                            font: {
+                                size: 11
                             }
+                        },
+                        grid: {
+                            color: 'rgba(0, 0, 0, 0.1)'
                         }
+                    },
+                    y: {
+                        ticks: {
+                            font: {
+                                size: 11
+                            }
+                        },
+                        grid: {
+                            display: false
+                        }
+                    }
+                },
+                elements: {
+                    bar: {
+                        borderRadius: 6,
                     }
                 }
             }
@@ -334,8 +519,8 @@ class DashboardManager {
 
     async loadRecentRentals() {
         try {
-            // Buscar aluguéis mensais recentes (últimos 10)
-            const rentals = await this.apiClient.get('/api/alugueis/mensais/?limit=10');
+            // Buscar aluguéis recentes via endpoint específico do dashboard
+            const rentals = await this.apiClient.get('/api/dashboard/recent-rentals');
 
             const container = document.getElementById('alugueis-recentes-table');
 
@@ -351,16 +536,18 @@ class DashboardManager {
 
             const data = rentals.map(rental => [
                 rental.id,
-                `Imóvel ${rental.id_imovel}`,
-                `Proprietário ${rental.id_proprietario}`,
+                rental.imovel,
+                rental.proprietario,
                 `R$ ${(rental.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                new Date(rental.data_referencia).toLocaleDateString('pt-BR')
+                rental.data_referencia,
+                rental.status
             ]);
 
             this.alugueisTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Valor', 'Data Referência'],
+                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Valor Total', 'Data Ref.', 'Status'],
                 columns: [
+                    { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },
                     { type: 'text', readOnly: true },

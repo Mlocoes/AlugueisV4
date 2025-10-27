@@ -201,3 +201,44 @@ def get_dashboard_charts(db: Session = Depends(get_db), current_user: Usuario = 
         "distribuicao_tipos": distribuicao_tipos,
         "receita_por_proprietario": receita_por_proprietario
     }
+
+@router.get("/recent-rentals")
+def get_recent_rentals(limit: int = 10, db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_active_user)):
+    # Verificar permissões de acesso aos proprietários
+    permitted = None
+    if current_user.tipo != 'administrador':
+        from app.core.permissions import get_permitted_proprietarios
+        permitted = get_permitted_proprietarios(current_user, db)
+    
+    from app.models.aluguel import AluguelMensal
+    from app.models.imovel import Imovel
+    from app.models.usuario import Usuario
+    
+    # Buscar aluguéis recentes
+    query = db.query(AluguelMensal).join(
+        Imovel, AluguelMensal.id_imovel == Imovel.id
+    ).join(
+        Usuario, AluguelMensal.id_proprietario == Usuario.id
+    ).order_by(AluguelMensal.created_at.desc()).limit(limit)
+    
+    if permitted is not None:
+        if permitted:
+            query = query.filter(AluguelMensal.id_proprietario.in_(permitted))
+        else:
+            query = query.filter(False)
+    
+    alugueis = query.all()
+    
+    result = []
+    for aluguel in alugueis:
+        result.append({
+            "id": aluguel.id,
+            "imovel": aluguel.imovel.endereco if aluguel.imovel else "N/A",
+            "proprietario": aluguel.proprietario.nome if aluguel.proprietario else "N/A",
+            "valor_total": float(aluguel.valor_total) if aluguel.valor_total else 0,
+            "data_referencia": aluguel.data_referencia.strftime("%d/%m/%Y") if aluguel.data_referencia else "",
+            "status": aluguel.status or "N/A",
+            "created_at": aluguel.created_at.strftime("%d/%m/%Y %H:%M") if aluguel.created_at else ""
+        })
+    
+    return result
