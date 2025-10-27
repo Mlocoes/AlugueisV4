@@ -1,6 +1,6 @@
 # 🎯 PROGRESSO DA IMPLEMENTAÇÃO - Sistema de Gestão de Aluguéis V4
 
-## 📊 Status Geral: 97% Completo
+## 📊 Status Geral: 98% Completo
 
 ---
 
@@ -251,7 +251,7 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 - ✅ Filtros múltiplos simultâneos - **IMPLEMENTADO**
 - ✅ Salvamento de filtros favoritos - **IMPLEMENTADO**
 - ✅ Filtros por data de criação (de/até) - **IMPLEMENTADO**
-- [ ] Exportação de dados filtrados
+- ✅ Exportação de dados filtrados - **IMPLEMENTADO**
 - [ ] Ordenação avançada
 
 #### Funcionalidades Implementadas:
@@ -312,4 +312,18 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 - **Feedback Visual:** Loading states e mensagens de erro
 - **Persistência:** Resultados mantidos até nova busca
 
-### Versão 1.5 - Funcionalidades Avançadas (FUTURO)
+### ✅ Versão 1.4.2 - Exportação de Dados Filtrados (CONCLUÍDO)
+
+#### Exportação Inteligente com Filtros Aplicados
+- ✅ Exportação Excel/CSV respeita todos os filtros ativos na interface
+- ✅ Filtros incluídos: busca por texto, status, datas de criação, imóveis, proprietários
+- ✅ Endpoints atualizados em todos os módulos (imóveis, proprietários, aluguéis, participações)
+- ✅ JavaScript modificado para passar parâmetros de filtro na URL de exportação
+- ✅ Funcionalidade completa: dados exportados são exatamente os visualizados na tabela
+
+#### Funcionalidades Implementadas:
+- **Filtros Integrados:** Todos os filtros da interface são aplicados na exportação
+- **Múltiplos Formatos:** Suporte a Excel (.xlsx) e CSV (.csv)
+- **Nomes Automáticos:** Arquivos nomeados com timestamp para evitar conflitos
+- **Performance Otimizada:** Filtros aplicados no banco de dados, não na memória
+- **Segurança:** Respeita permissões do usuário logado
