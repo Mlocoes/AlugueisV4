@@ -228,6 +228,8 @@ def export_usuarios(
     q: str = None,
     tipo: str = None,
     status: str = None,
+    created_at_de: str = None,
+    created_at_ate: str = None,
     format: str = "excel",
     db: Session = Depends(get_db),
     current_user: UsuarioModel = Depends(get_current_admin_user)
@@ -254,6 +256,26 @@ def export_usuarios(
             query = query.filter(UsuarioModel.ativo == True)
         elif status == "Inativo":
             query = query.filter(UsuarioModel.ativo == False)
+    
+    # Filtro por data de criação
+    if created_at_de:
+        from datetime import datetime
+        try:
+            date_de = datetime.strptime(created_at_de, '%Y-%m-%d')
+            query = query.filter(UsuarioModel.criado_em >= date_de)
+        except ValueError:
+            pass  # Ignorar filtro inválido
+    
+    if created_at_ate:
+        from datetime import datetime
+        try:
+            date_ate = datetime.strptime(created_at_ate, '%Y-%m-%d')
+            # Adicionar um dia para incluir o dia final
+            from datetime import timedelta
+            date_ate = date_ate + timedelta(days=1)
+            query = query.filter(UsuarioModel.criado_em < date_ate)
+        except ValueError:
+            pass  # Ignorar filtro inválido
     
     # Filtro por busca (nome, email, username)
     if q:

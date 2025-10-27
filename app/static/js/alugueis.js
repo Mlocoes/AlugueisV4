@@ -598,12 +598,16 @@ class AlugueisManager {
             const imovel = document.getElementById('filter-imovel').value;
             const status = document.getElementById('filter-status').value;
             const mes = document.getElementById('filter-mes').value;
+            const dataInicioDe = document.getElementById('filter-data-inicio-de').value;
+            const dataInicioAte = document.getElementById('filter-data-inicio-ate').value;
             
             // Construir parâmetros da URL
             const params = new URLSearchParams();
             if (imovel) params.append('imovel', imovel);
             if (status && status !== '') params.append('status', status);
             if (mes) params.append('mes', mes);
+            if (dataInicioDe) params.append('data_inicio_de', dataInicioDe);
+            if (dataInicioAte) params.append('data_inicio_ate', dataInicioAte);
             params.append('format', format);
             
             // Fazer download

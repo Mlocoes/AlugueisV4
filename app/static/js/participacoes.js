@@ -430,11 +430,15 @@ class ParticipacoesManager {
             // Obter filtros atuais
             const imovel = document.getElementById('filter-imovel').value;
             const proprietario = document.getElementById('filter-proprietario').value;
+            const dataCriacaoDe = document.getElementById('filter-data-criacao-de').value;
+            const dataCriacaoAte = document.getElementById('filter-data-criacao-ate').value;
             
             // Construir parâmetros da URL
             const params = new URLSearchParams();
             if (imovel) params.append('imovel', imovel);
             if (proprietario) params.append('proprietario', proprietario);
+            if (dataCriacaoDe) params.append('created_at_de', dataCriacaoDe);
+            if (dataCriacaoAte) params.append('created_at_ate', dataCriacaoAte);
             params.append('format', format);
             
             // Fazer download

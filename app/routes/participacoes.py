@@ -232,6 +232,8 @@ def listar_participacoes_imovel(
 def export_participacoes(
     imovel: str = None,
     proprietario: str = None,
+    created_at_de: str = None,
+    created_at_ate: str = None,
     format: str = "excel",
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
@@ -263,6 +265,26 @@ def export_participacoes(
             query = query.filter(ParticipacaoModel.id_proprietario == proprietario_id)
         except ValueError:
             pass  # Ignorar se não for um ID válido
+    
+    # Filtro por data de criação
+    if created_at_de:
+        from datetime import datetime
+        try:
+            date_de = datetime.strptime(created_at_de, '%Y-%m-%d')
+            query = query.filter(ParticipacaoModel.data_cadastro >= date_de)
+        except ValueError:
+            pass  # Ignorar filtro inválido
+    
+    if created_at_ate:
+        from datetime import datetime
+        try:
+            date_ate = datetime.strptime(created_at_ate, '%Y-%m-%d')
+            # Adicionar um dia para incluir o dia final
+            from datetime import timedelta
+            date_ate = date_ate + timedelta(days=1)
+            query = query.filter(ParticipacaoModel.data_cadastro < date_ate)
+        except ValueError:
+            pass  # Ignorar filtro inválido
     
     participacoes = query.all()
     

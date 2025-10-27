@@ -451,11 +451,15 @@ class ProprietariosManager {
             // Obter filtros atuais
             const nome = document.getElementById('search-nome').value.trim();
             const status = document.getElementById('filter-status').value;
+            const dataCriacaoDe = document.getElementById('filter-data-criacao-de').value;
+            const dataCriacaoAte = document.getElementById('filter-data-criacao-ate').value;
             
             // Construir parâmetros da URL
             const params = new URLSearchParams();
             if (nome) params.append('q', nome);
             if (status && status !== '') params.append('status', status === 'ativo' ? 'Ativo' : 'Inativo');
+            if (dataCriacaoDe) params.append('created_at_de', dataCriacaoDe);
+            if (dataCriacaoAte) params.append('created_at_ate', dataCriacaoAte);
             params.append('format', format);
             
             // Fazer download

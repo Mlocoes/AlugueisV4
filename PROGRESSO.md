@@ -1,6 +1,6 @@
 # 🎯 PROGRESSO DA IMPLEMENTAÇÃO - Sistema de Gestão de Aluguéis V4
 
-## 📊 Status Geral: 95% Completo
+## 📊 Status Geral: 97% Completo
 
 ---
 
@@ -294,3 +294,22 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 - [ ] Backup diário do banco de dados
 - [ ] Restauração de backups
 - [ ] Versionamento de backups
+
+### ✅ Versão 1.4.1 - Busca Global (CONCLUÍDO)
+
+#### Busca Global em Tempo Real
+- ✅ Campo de busca no header disponível em todas as páginas
+- ✅ Busca simultânea em imóveis, proprietários, aluguéis e participações
+- ✅ Resultados categorizados com ícones e navegação rápida
+- ✅ Debounce de 300ms para performance otimizada
+- ✅ Interface responsiva com dropdown de resultados
+- ✅ Atalhos de teclado (Enter para buscar, ESC para fechar)
+
+#### Funcionalidades Implementadas:
+- **Busca Paralela:** Consultas simultâneas em múltiplas tabelas via Promise.allSettled
+- **Resultados Organizados:** Seções separadas por tipo de entidade com contadores
+- **Navegação Rápida:** Links diretos para as páginas específicas
+- **Feedback Visual:** Loading states e mensagens de erro
+- **Persistência:** Resultados mantidos até nova busca
+
+### Versão 1.5 - Funcionalidades Avançadas (FUTURO)
