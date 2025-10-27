@@ -495,3 +495,66 @@
         box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
     }
 }
+
+/* Advanced Sorting Indicators */
+.handsontable th.sort-active {
+    background-color: #f3f4f6 !important;
+    border-bottom: 2px solid #3b82f6 !important;
+    position: relative;
+}
+
+.handsontable th.sort-active.sort-ascending::after {
+    content: ' ↑';
+    color: #3b82f6;
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+.handsontable th.sort-active.sort-descending::after {
+    content: ' ↓';
+    color: #3b82f6;
+    font-weight: bold;
+    margin-left: 4px;
+}
+
+.handsontable th.sort-active:hover {
+    background-color: #e5e7eb !important;
+}
+
+/* Tooltip styling for sort indicators */
+.handsontable th[title] {
+    cursor: help;
+}
+
+/* Multiple sort indicators */
+.handsontable th.sort-active::before {
+    content: '';
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 16px;
+    height: 16px;
+    background-color: #3b82f6;
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 1;
+}
+
+/* Sort priority numbers */
+.handsontable th.sort-active.sort-priority-1::before { content: '1'; }
+.handsontable th.sort-active.sort-priority-2::before { content: '2'; }
+.handsontable th.sort-active.sort-priority-3::before { content: '3'; }
+
+/* Enhanced column headers */
+.handsontable th {
+    transition: all 0.2s ease;
+}
+
+.handsontable th:hover {
+    background-color: #f9fafb;
+}

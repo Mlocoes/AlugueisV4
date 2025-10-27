@@ -163,6 +163,7 @@ class ProprietariosManager {
                 },
                 afterColumnSort: (currentSortConfig, destinationSortConfigs) => {
                     this.saveSortConfig(currentSortConfig);
+                    this.updateSortIndicators(currentSortConfig);
                 },
                 cells: function(row, col) {
                     const cellProperties = {};
@@ -498,6 +499,36 @@ class ProprietariosManager {
             }
         } catch (error) {
             console.error('Erro ao salvar configuração de ordenação:', error);
+        }
+    }
+
+    updateSortIndicators(sortConfig) {
+        if (!this.proprietariosTable) return;
+
+        // Remover indicadores anteriores
+        const headers = this.proprietariosTable.getColHeader();
+        headers.forEach((header, index) => {
+            const th = this.proprietariosTable.getCell(-1, index);
+            if (th) {
+                th.classList.remove('sort-ascending', 'sort-descending', 'sort-active', 'sort-priority-1', 'sort-priority-2', 'sort-priority-3');
+                th.title = header; // Reset tooltip
+            }
+        });
+
+        // Adicionar indicadores para colunas ordenadas
+        if (sortConfig && sortConfig.length > 0) {
+            sortConfig.forEach((config, sortIndex) => {
+                const th = this.proprietariosTable.getCell(-1, config.column);
+                if (th) {
+                    const direction = config.sortOrder === 'asc' ? 'ascending' : 'descending';
+                    th.classList.add('sort-active', `sort-${direction}`, `sort-priority-${sortIndex + 1}`);
+                    
+                    // Adicionar tooltip informativo
+                    const sortNumber = sortConfig.length > 1 ? ` (${sortIndex + 1}ª prioridade)` : '';
+                    const directionText = config.sortOrder === 'asc' ? 'crescente' : 'decrescente';
+                    th.title = `${headers[config.column]} - Ordenado por ${directionText}${sortNumber}`;
+                }
+            });
         }
     }
 }
