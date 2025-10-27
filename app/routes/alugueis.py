@@ -211,6 +211,8 @@ def read_alugueis_mensais(
     proprietario_id: Optional[int] = None,
     ano: Optional[int] = None,
     mes: Optional[int] = None,
+    data_inicio_de: Optional[str] = None,
+    data_inicio_ate: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
@@ -229,6 +231,23 @@ def read_alugueis_mensais(
             data_fim = date(ano, mes + 1, 1)
         query = query.filter(AluguelMensalModel.data_referencia >= data_inicio, 
                            AluguelMensalModel.data_referencia < data_fim)
+    
+    # Filtros por data de início
+    if data_inicio_de:
+        from datetime import datetime
+        try:
+            data_de = datetime.strptime(data_inicio_de, '%Y-%m-%d').date()
+            query = query.filter(AluguelMensalModel.data_inicio >= data_de)
+        except ValueError:
+            pass  # Ignorar formato inválido
+    
+    if data_inicio_ate:
+        from datetime import datetime
+        try:
+            data_ate = datetime.strptime(data_inicio_ate, '%Y-%m-%d').date()
+            query = query.filter(AluguelMensalModel.data_inicio <= data_ate)
+        except ValueError:
+            pass  # Ignorar formato inválido
     
     # Aplicar filtros de permissão e visibilidade (registros inativos)
     query = filter_by_permissions(query, current_user, db, 'id_proprietario')
@@ -300,6 +319,8 @@ def export_alugueis(
     imovel: str = None,
     status: str = None,
     mes: str = None,
+    data_inicio_de: str = None,
+    data_inicio_ate: str = None,
     format: str = "excel",
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
@@ -339,6 +360,21 @@ def export_alugueis(
             )
         except ValueError:
             pass  # Ignorar se formato inválido
+    
+    # Filtros por data de início
+    if data_inicio_de:
+        try:
+            data_de = datetime.strptime(data_inicio_de, '%Y-%m-%d').date()
+            query = query.filter(AluguelMensalModel.data_inicio >= data_de)
+        except ValueError:
+            pass  # Ignorar formato inválido
+    
+    if data_inicio_ate:
+        try:
+            data_ate = datetime.strptime(data_inicio_ate, '%Y-%m-%d').date()
+            query = query.filter(AluguelMensalModel.data_inicio <= data_ate)
+        except ValueError:
+            pass  # Ignorar formato inválido
     
     alugueis = query.all()
     

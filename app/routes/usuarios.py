@@ -16,6 +16,11 @@ def read_usuarios(
     limit: int = 100,
     q: str = None,
     tipo: str = None,
+    role: str = None,
+    nome: str = None,
+    ativo: bool = None,
+    created_at_de: str = None,
+    created_at_ate: str = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_admin_user)  # Só admin pode listar usuários
 ):
@@ -26,6 +31,41 @@ def read_usuarios(
     # Filtro por tipo se especificado
     if tipo:
         query = query.filter(UsuarioModel.tipo == tipo)
+    
+    # Filtro por role se especificado (para compatibilidade com frontend)
+    if role:
+        if role == 'proprietario':
+            query = query.filter(UsuarioModel.tipo == 'usuario')
+        else:
+            query = query.filter(UsuarioModel.tipo == role)
+    
+    # Filtro por nome se especificado
+    if nome:
+        query = query.filter(UsuarioModel.nome.ilike(f"%{nome}%"))
+    
+    # Filtro por status ativo se especificado
+    if ativo is not None:
+        query = query.filter(UsuarioModel.ativo == ativo)
+    
+    # Filtro por data de criação
+    if created_at_de:
+        from datetime import datetime
+        try:
+            date_de = datetime.strptime(created_at_de, '%Y-%m-%d')
+            query = query.filter(UsuarioModel.criado_em >= date_de)
+        except ValueError:
+            pass  # Ignorar filtro inválido
+    
+    if created_at_ate:
+        from datetime import datetime
+        try:
+            date_ate = datetime.strptime(created_at_ate, '%Y-%m-%d')
+            # Adicionar um dia para incluir o dia final
+            from datetime import timedelta
+            date_ate = date_ate + timedelta(days=1)
+            query = query.filter(UsuarioModel.criado_em < date_ate)
+        except ValueError:
+            pass  # Ignorar filtro inválido
     
     # Filtro por busca (nome, email, username)
     if q:

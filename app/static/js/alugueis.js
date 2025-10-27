@@ -379,6 +379,8 @@ class AlugueisManager {
         document.getElementById('filter-imovel').value = '';
         document.getElementById('filter-status').value = '';
         document.getElementById('filter-mes').value = '';
+        document.getElementById('filter-data-inicio-de').value = '';
+        document.getElementById('filter-data-inicio-ate').value = '';
         
         // Limpar localStorage
         localStorage.removeItem('alugueis_filters');
@@ -390,7 +392,9 @@ class AlugueisManager {
     saveFilters() {
         const filters = {
             imovel: document.getElementById('filter-imovel').value,
-            mes: document.getElementById('filter-mes').value
+            mes: document.getElementById('filter-mes').value,
+            dataInicioDe: document.getElementById('filter-data-inicio-de').value,
+            dataInicioAte: document.getElementById('filter-data-inicio-ate').value
         };
         
         localStorage.setItem('alugueis_filters', JSON.stringify(filters));
@@ -408,13 +412,16 @@ class AlugueisManager {
                 if (filters.mes) {
                     document.getElementById('filter-mes').value = filters.mes;
                 }
+                if (filters.dataInicioDe) {
+                    document.getElementById('filter-data-inicio-de').value = filters.dataInicioDe;
+                }
+                if (filters.dataInicioAte) {
+                    document.getElementById('filter-data-inicio-ate').value = filters.dataInicioAte;
+                }
                 
                 // Aplicar filtros salvos
-                if (filters.imovel || filters.mes) {
-                    // Aguardar um pouco para garantir que os dados foram carregados
-                    setTimeout(() => {
-                        this.searchAlugueis();
-                    }, 100);
+                if (filters.imovel || filters.mes || filters.dataInicioDe || filters.dataInicioAte) {
+                    this.searchAlugueis();
                 }
             } catch (error) {
                 console.error('Erro ao carregar filtros salvos:', error);
@@ -432,6 +439,8 @@ class AlugueisManager {
 
         const imovelId = document.getElementById('filter-imovel').value;
         const mes = document.getElementById('filter-mes').value;
+        const dataInicioDe = document.getElementById('filter-data-inicio-de').value;
+        const dataInicioAte = document.getElementById('filter-data-inicio-ate').value;
 
         let url = '/api/alugueis/mensais/?';
         const params = [];
@@ -442,6 +451,8 @@ class AlugueisManager {
             params.push(`ano=${ano}`);
             params.push(`mes=${mesNum}`);
         }
+        if (dataInicioDe) params.push(`data_inicio_de=${dataInicioDe}`);
+        if (dataInicioAte) params.push(`data_inicio_ate=${dataInicioAte}`);
 
         url += params.join('&');
 

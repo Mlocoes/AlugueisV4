@@ -28,7 +28,7 @@
             <!-- Filtros e Busca -->
             <div class="bg-white shadow rounded-lg mb-6">
                 <div class="px-4 py-5 sm:p-6">
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                         <div>
                             <label for="filter-imovel" class="block text-sm font-medium text-gray-700">Imóvel</label>
                             <select id="filter-imovel" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
@@ -40,6 +40,14 @@
                             <select id="filter-proprietario" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                                 <option value="">Todos os proprietários</option>
                             </select>
+                        </div>
+                        <div>
+                            <label for="filter-data-criacao-de" class="block text-sm font-medium text-gray-700">Data Criação De</label>
+                            <input type="date" id="filter-data-criacao-de" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
+                        </div>
+                        <div>
+                            <label for="filter-data-criacao-ate" class="block text-sm font-medium text-gray-700">Data Criação Até</label>
+                            <input type="date" id="filter-data-criacao-ate" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-sm">
                         </div>
                         <div class="flex items-end space-x-2">
                             <button id="search-btn" class="inline-flex items-center rounded-md bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-500">

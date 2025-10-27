@@ -62,6 +62,8 @@ class ProprietariosManager {
         this.loadSavedFilters();
         document.getElementById('search-nome').addEventListener('change', () => this.saveFilters());
         document.getElementById('filter-status').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-data-criacao-de').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-data-criacao-ate').addEventListener('change', () => this.saveFilters());
     }
 
     async logout() {
@@ -259,6 +261,8 @@ class ProprietariosManager {
         // Limpar os campos de filtro
         document.getElementById('search-nome').value = '';
         document.getElementById('filter-status').value = '';
+        document.getElementById('filter-data-criacao-de').value = '';
+        document.getElementById('filter-data-criacao-ate').value = '';
         
         // Limpar localStorage
         localStorage.removeItem('proprietarios_filters');
@@ -270,7 +274,9 @@ class ProprietariosManager {
     saveFilters() {
         const filters = {
             nome: document.getElementById('search-nome').value,
-            status: document.getElementById('filter-status').value
+            status: document.getElementById('filter-status').value,
+            dataCriacaoDe: document.getElementById('filter-data-criacao-de').value,
+            dataCriacaoAte: document.getElementById('filter-data-criacao-ate').value
         };
         
         localStorage.setItem('proprietarios_filters', JSON.stringify(filters));
@@ -288,9 +294,15 @@ class ProprietariosManager {
                 if (filters.status) {
                     document.getElementById('filter-status').value = filters.status;
                 }
+                if (filters.dataCriacaoDe) {
+                    document.getElementById('filter-data-criacao-de').value = filters.dataCriacaoDe;
+                }
+                if (filters.dataCriacaoAte) {
+                    document.getElementById('filter-data-criacao-ate').value = filters.dataCriacaoAte;
+                }
                 
                 // Aplicar filtros salvos
-                if (filters.nome || filters.status) {
+                if (filters.nome || filters.status || filters.dataCriacaoDe || filters.dataCriacaoAte) {
                     this.searchProprietarios();
                 }
             } catch (error) {
@@ -302,10 +314,14 @@ class ProprietariosManager {
     async searchProprietarios() {
         const nome = document.getElementById('search-nome').value;
         const status = document.getElementById('filter-status').value;
+        const dataCriacaoDe = document.getElementById('filter-data-criacao-de').value;
+        const dataCriacaoAte = document.getElementById('filter-data-criacao-ate').value;
 
         let url = '/usuarios?role=proprietario';
         if (nome) url += `&nome=${encodeURIComponent(nome)}`;
         if (status && status !== '') url += `&ativo=${status === 'ativo'}`;
+        if (dataCriacaoDe) url += `&created_at_de=${dataCriacaoDe}`;
+        if (dataCriacaoAte) url += `&created_at_ate=${dataCriacaoAte}`;
 
         try {
             const proprietarios = await this.apiClient.get(url.replace('/usuarios', '/api/usuarios/'));

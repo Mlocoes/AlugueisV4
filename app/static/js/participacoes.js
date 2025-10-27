@@ -64,6 +64,8 @@ class ParticipacoesManager {
         this.loadSavedFilters();
         document.getElementById('filter-imovel').addEventListener('change', () => this.saveFilters());
         document.getElementById('filter-proprietario').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-data-criacao-de').addEventListener('change', () => this.saveFilters());
+        document.getElementById('filter-data-criacao-ate').addEventListener('change', () => this.saveFilters());
     }
 
     async logout() {
@@ -188,7 +190,7 @@ class ParticipacoesManager {
                         renderer: function(instance, td, row, col, prop, value, cellProperties) {
                                 const participacaoId = instance.getDataAtRow(row)[0];
                                 // Obter proprietario do registro para checar permissão
-                                const part = participacoesManager.participacoesData ? participacoesManager.participacoesData.find(p => p.id === participacaoId) : null;
+                                const part = participacoesManager.participacoesData ? participacoesManager.participacoesManager.participacoesData.find(p => p.id === participacaoId) : null;
                                 const ownerId = part ? part.id_proprietario : null;
                                 const isAdmin = participacoesManager.apiClient.isAdmin();
                                 const canEditSet = new Set((participacoesManager.permissions && participacoesManager.permissions.editar) || []);
@@ -229,6 +231,8 @@ class ParticipacoesManager {
         // Limpar os campos de filtro
         document.getElementById('filter-imovel').value = '';
         document.getElementById('filter-proprietario').value = '';
+        document.getElementById('filter-data-criacao-de').value = '';
+        document.getElementById('filter-data-criacao-ate').value = '';
         
         // Limpar localStorage
         localStorage.removeItem('participacoes_filters');
@@ -240,7 +244,9 @@ class ParticipacoesManager {
     saveFilters() {
         const filters = {
             imovel: document.getElementById('filter-imovel').value,
-            proprietario: document.getElementById('filter-proprietario').value
+            proprietario: document.getElementById('filter-proprietario').value,
+            dataCriacaoDe: document.getElementById('filter-data-criacao-de').value,
+            dataCriacaoAte: document.getElementById('filter-data-criacao-ate').value
         };
         
         localStorage.setItem('participacoes_filters', JSON.stringify(filters));
@@ -258,9 +264,15 @@ class ParticipacoesManager {
                 if (filters.proprietario) {
                     document.getElementById('filter-proprietario').value = filters.proprietario;
                 }
+                if (filters.dataCriacaoDe) {
+                    document.getElementById('filter-data-criacao-de').value = filters.dataCriacaoDe;
+                }
+                if (filters.dataCriacaoAte) {
+                    document.getElementById('filter-data-criacao-ate').value = filters.dataCriacaoAte;
+                }
                 
                 // Aplicar filtros salvos
-                if (filters.imovel || filters.proprietario) {
+                if (filters.imovel || filters.proprietario || filters.dataCriacaoDe || filters.dataCriacaoAte) {
                     this.searchParticipacoes();
                 }
             } catch (error) {
@@ -272,11 +284,15 @@ class ParticipacoesManager {
     async searchParticipacoes() {
         const imovelId = document.getElementById('filter-imovel').value;
         const proprietarioId = document.getElementById('filter-proprietario').value;
+        const dataCriacaoDe = document.getElementById('filter-data-criacao-de').value;
+        const dataCriacaoAte = document.getElementById('filter-data-criacao-ate').value;
 
         let url = '/participacoes?';
         const params = [];
         if (imovelId) params.push(`imovel_id=${imovelId}`);
         if (proprietarioId) params.push(`proprietario_id=${proprietarioId}`);
+        if (dataCriacaoDe) params.push(`created_at_de=${dataCriacaoDe}`);
+        if (dataCriacaoAte) params.push(`created_at_ate=${dataCriacaoAte}`);
 
         url += params.join('&');
 

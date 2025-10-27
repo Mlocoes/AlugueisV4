@@ -15,12 +15,44 @@ router = APIRouter()
 def read_participacoes(
     skip: int = 0,
     limit: int = 100,
+    imovel_id: int = None,
+    proprietario_id: int = None,
+    created_at_de: str = None,
+    created_at_ate: str = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_active_user)
 ):
     # Aplicar filtros de permissão financeira
     query = db.query(ParticipacaoModel)
     query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    # Filtro por imóvel
+    if imovel_id:
+        query = query.filter(ParticipacaoModel.id_imovel == imovel_id)
+    
+    # Filtro por proprietário
+    if proprietario_id:
+        query = query.filter(ParticipacaoModel.id_proprietario == proprietario_id)
+    
+    # Filtro por data de criação
+    if created_at_de:
+        from datetime import datetime
+        try:
+            date_de = datetime.strptime(created_at_de, '%Y-%m-%d')
+            query = query.filter(ParticipacaoModel.data_cadastro >= date_de)
+        except ValueError:
+            pass  # Ignorar filtro inválido
+    
+    if created_at_ate:
+        from datetime import datetime
+        try:
+            date_ate = datetime.strptime(created_at_ate, '%Y-%m-%d')
+            # Adicionar um dia para incluir o dia final
+            from datetime import timedelta
+            date_ate = date_ate + timedelta(days=1)
+            query = query.filter(ParticipacaoModel.data_cadastro < date_ate)
+        except ValueError:
+            pass  # Ignorar filtro inválido
     
     participacoes = query.offset(skip).limit(limit).all()
     return participacoes
