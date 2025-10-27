@@ -325,6 +325,20 @@
     margin-bottom: 1rem;
 }
 
+.chart-wrapper {
+    position: relative;
+    height: 300px;
+    width: 100%;
+}
+
+.chart-wrapper canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100% !important;
+    height: 100% !important;
+}
+
 /* Status badges */
 .badge-success {
     display: inline-flex;

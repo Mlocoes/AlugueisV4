@@ -3,8 +3,8 @@
 // ApiClient class for handling API requests
 class ApiClient {
     constructor() {
-        // Usar porta 8003 para evitar conflitos
-        this.baseURL = window.location.protocol + '//' + window.location.hostname + ':8003';
+        // Usar porta 8000 (porta correta do servidor)
+        this.baseURL = window.location.protocol + '//' + window.location.hostname + ':8000';
         // Usar localStorage para armazenar o token JWT
         this.token = localStorage.getItem('access_token');
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento

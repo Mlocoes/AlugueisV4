@@ -64,21 +64,29 @@
 
     <!-- Gráficos -->
     <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200 chart-container">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Receita por Mês</h3>
-            <canvas id="receita-chart" height="250"></canvas>
+            <div class="chart-wrapper" style="height: 300px;">
+                <canvas id="receita-chart"></canvas>
+            </div>
         </div>
-        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200 chart-container">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Status dos Imóveis</h3>
-            <canvas id="status-imoveis-chart" height="250"></canvas>
+            <div class="chart-wrapper" style="height: 300px;">
+                <canvas id="status-imoveis-chart"></canvas>
+            </div>
         </div>
-        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200 chart-container">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Distribuição por Tipo de Imóvel</h3>
-            <canvas id="tipos-imoveis-chart" height="250"></canvas>
+            <div class="chart-wrapper" style="height: 300px;">
+                <canvas id="tipos-imoveis-chart"></canvas>
+            </div>
         </div>
-        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200">
+        <div class="bg-white p-6 rounded-lg shadow-lg border border-gray-200 chart-container">
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Receita por Proprietário (Top 5)</h3>
-            <canvas id="receita-proprietarios-chart" height="250"></canvas>
+            <div class="chart-wrapper" style="height: 300px;">
+                <canvas id="receita-proprietarios-chart"></canvas>
+            </div>
         </div>
     </div>
 

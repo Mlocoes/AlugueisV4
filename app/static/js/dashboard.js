@@ -53,6 +53,17 @@ class DashboardManager {
 
     setupEventListeners() {
         document.getElementById('logout-btn').addEventListener('click', () => this.logout());
+        
+        // Adicionar listener para redimensionamento da janela
+        window.addEventListener('resize', () => {
+            // Redimensionar gráficos após um pequeno delay
+            setTimeout(() => {
+                if (this.receitaChart) this.receitaChart.resize();
+                if (this.statusImoveisChart) this.statusImoveisChart.resize();
+                if (this.tiposImoveisChart) this.tiposImoveisChart.resize();
+                if (this.receitaProprietariosChart) this.receitaProprietariosChart.resize();
+            }, 100);
+        });
     }
 
     async logout() {
@@ -134,9 +145,21 @@ class DashboardManager {
 
         const ctx = document.getElementById('receita-chart').getContext('2d');
 
+        // Destruir gráfico anterior se existir
         if (this.receitaChart) {
+            console.log('Destruindo gráfico de receita anterior');
             this.receitaChart.destroy();
         }
+
+        // Verificar se o canvas está visível e tem dimensões
+        const canvas = document.getElementById('receita-chart');
+        if (!canvas || canvas.offsetHeight === 0) {
+            console.warn('Canvas de receita não está pronto, tentando novamente em 100ms');
+            setTimeout(() => this.renderReceitaChart(data), 100);
+            return;
+        }
+
+        console.log('Renderizando gráfico de receita com dados:', data);
 
         // Processar dados para o formato esperado pelo Chart.js
         const labels = data.map(item => item.mes || 'N/A');
@@ -238,9 +261,21 @@ class DashboardManager {
 
         const ctx = document.getElementById('status-imoveis-chart').getContext('2d');
 
+        // Destruir gráfico anterior se existir
         if (this.statusImoveisChart) {
+            console.log('Destruindo gráfico de status anterior');
             this.statusImoveisChart.destroy();
         }
+
+        // Verificar se o canvas está visível e tem dimensões
+        const canvas = document.getElementById('status-imoveis-chart');
+        if (!canvas || canvas.offsetHeight === 0) {
+            console.warn('Canvas de status não está pronto, tentando novamente em 100ms');
+            setTimeout(() => this.renderStatusImoveisChart(data), 100);
+            return;
+        }
+
+        console.log('Renderizando gráfico de status com dados:', data);
 
         // Processar dados para o formato esperado pelo Chart.js
         const labels = data.map(item => item.status || 'N/A');
@@ -343,9 +378,21 @@ class DashboardManager {
 
         const ctx = document.getElementById('tipos-imoveis-chart').getContext('2d');
 
+        // Destruir gráfico anterior se existir
         if (this.tiposImoveisChart) {
+            console.log('Destruindo gráfico de tipos anterior');
             this.tiposImoveisChart.destroy();
         }
+
+        // Verificar se o canvas está visível e tem dimensões
+        const canvas = document.getElementById('tipos-imoveis-chart');
+        if (!canvas || canvas.offsetHeight === 0) {
+            console.warn('Canvas de tipos não está pronto, tentando novamente em 100ms');
+            setTimeout(() => this.renderTiposImoveisChart(data), 100);
+            return;
+        }
+
+        console.log('Renderizando gráfico de tipos com dados:', data);
 
         // Processar dados para o formato esperado pelo Chart.js
         const labels = data.map(item => item.tipo || 'N/A');
@@ -424,9 +471,21 @@ class DashboardManager {
 
         const ctx = document.getElementById('receita-proprietarios-chart').getContext('2d');
 
+        // Destruir gráfico anterior se existir
         if (this.receitaProprietariosChart) {
+            console.log('Destruindo gráfico de proprietários anterior');
             this.receitaProprietariosChart.destroy();
         }
+
+        // Verificar se o canvas está visível e tem dimensões
+        const canvas = document.getElementById('receita-proprietarios-chart');
+        if (!canvas || canvas.offsetHeight === 0) {
+            console.warn('Canvas de proprietários não está pronto, tentando novamente em 100ms');
+            setTimeout(() => this.renderReceitaProprietariosChart(data), 100);
+            return;
+        }
+
+        console.log('Renderizando gráfico de proprietários com dados:', data);
 
         // Processar dados para o formato esperado pelo Chart.js
         const labels = data.map(item => item.proprietario || 'N/A');
