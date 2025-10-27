@@ -182,3 +182,116 @@ def delete_imovel(
     db.delete(db_imovel)
     db.commit()
     return {"message": "Imovel deleted successfully"}
+
+@router.get("/export")
+def export_imoveis(
+    endereco: str = None,
+    tipo: str = None,
+    status: str = None,
+    valor_min: float = None,
+    valor_max: float = None,
+    format: str = "excel",
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Exportar imóveis filtrados para Excel ou CSV
+    """
+    from fastapi.responses import StreamingResponse
+    import io
+    import pandas as pd
+    from datetime import datetime
+    
+    # Aplicar filtros de permissão
+    query = db.query(ImovelModel)
+    query = filter_inactive_records(query, current_user)
+    
+    # Aplicar filtros de busca
+    if endereco:
+        search_term = f"%{endereco}%"
+        query = query.filter(
+            (ImovelModel.endereco.ilike(search_term)) |
+            (ImovelModel.nome.ilike(search_term))
+        )
+    
+    if tipo and tipo != "Todos":
+        query = query.filter(ImovelModel.tipo == tipo)
+    
+    if status and status != "Todos":
+        if status == "alugado":
+            query = query.filter(ImovelModel.alugado == True)
+        elif status == "disponivel":
+            query = query.filter(ImovelModel.alugado == False)
+    
+    if valor_min is not None or valor_max is not None:
+        if valor_min is not None:
+            query = query.filter(ImovelModel.valor_mercado >= valor_min)
+        if valor_max is not None:
+            query = query.filter(ImovelModel.valor_mercado <= valor_max)
+    
+    imoveis = query.all()
+    
+    # Preparar dados para exportação
+    data = []
+    for imovel in imoveis:
+        data.append({
+            'ID': imovel.id,
+            'Nome': imovel.nome or '',
+            'Endereço': imovel.endereco or '',
+            'Tipo': imovel.tipo or '',
+            'Cidade': imovel.cidade or '',
+            'Estado': imovel.estado or '',
+            'Área Total (m²)': float(imovel.area_total) if imovel.area_total else '',
+            'Área Construída (m²)': float(imovel.area_construida) if imovel.area_construida else '',
+            'Valor Catastral': float(imovel.valor_catastral) if imovel.valor_catastral else '',
+            'Valor Mercado': float(imovel.valor_mercado) if imovel.valor_mercado else '',
+            'IPTU Anual': float(imovel.iptu_anual) if imovel.iptu_anual else '',
+            'Condomínio': float(imovel.condominio) if imovel.condominio else '',
+            'Status': 'Alugado' if imovel.alugado else 'Disponível',
+            'Ativo': 'Sim' if imovel.ativo else 'Não'
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Criar buffer para o arquivo
+    buffer = io.BytesIO()
+    
+    if format.lower() == "csv":
+        # Exportar como CSV
+        df.to_csv(buffer, index=False, encoding='utf-8-sig')
+        buffer.seek(0)
+        
+        filename = f"imoveis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    
+    else:
+        # Exportar como Excel
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Imóveis', index=False)
+            
+            # Ajustar largura das colunas
+            worksheet = writer.sheets['Imóveis']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)  # Máximo 50 caracteres
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        buffer.seek(0)
+        
+        filename = f"imoveis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )

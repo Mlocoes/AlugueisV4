@@ -46,6 +46,20 @@ class ImoveisManager {
         document.getElementById('cancel-btn').addEventListener('click', () => this.hideModal());
         document.getElementById('imovel-form').addEventListener('submit', (e) => this.saveImovel(e));
         
+        // Export functionality
+        document.getElementById('export-btn').addEventListener('click', (e) => this.toggleExportDropdown(e));
+        document.getElementById('export-excel').addEventListener('click', (e) => this.exportData(e, 'excel'));
+        document.getElementById('export-csv').addEventListener('click', (e) => this.exportData(e, 'csv'));
+        
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', (e) => {
+            const exportBtn = document.getElementById('export-btn');
+            const exportDropdown = document.getElementById('export-dropdown');
+            if (!exportBtn.contains(e.target) && !exportDropdown.contains(e.target)) {
+                exportDropdown.classList.add('hidden');
+            }
+        });
+        
         // Carregar filtros salvos
         this.loadSavedFilters();
         
@@ -148,6 +162,13 @@ class ImoveisManager {
                 readOnly: !isAdmin,
                 stretchH: 'all',
                 licenseKey: 'non-commercial-and-evaluation',
+                // Configuração de ordenação avançada
+                columnSorting: {
+                    sortEmptyCells: true,
+                    initialConfig: this.loadSortConfig(),
+                    headerAction: true,
+                    indicator: true
+                },
                 afterChange: (changes, source) => {
                     if (source === 'edit' && isAdmin && changes) {
                         // Pequeno delay para permitir edição rápida sem salvar intermediário
@@ -155,6 +176,9 @@ class ImoveisManager {
                             this.handleCellChange(changes);
                         }, 300);
                     }
+                },
+                afterColumnSort: (currentSortConfig, destinationSortConfigs) => {
+                    this.saveSortConfig(currentSortConfig);
                 },
                 cells: function(row, col) {
                     const cellProperties = {};
@@ -551,6 +575,74 @@ class ImoveisManager {
         };
 
         localStorage.setItem('imoveisFilters', JSON.stringify(filters));
+    }
+
+    toggleExportDropdown(e) {
+        e.preventDefault();
+        const dropdown = document.getElementById('export-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    async exportData(e, format) {
+        e.preventDefault();
+        
+        // Fechar dropdown
+        document.getElementById('export-dropdown').classList.add('hidden');
+        
+        try {
+            // Obter filtros atuais
+            const endereco = document.getElementById('search-endereco').value.trim();
+            const tipo = document.getElementById('filter-tipo').value;
+            const status = document.getElementById('filter-status').value;
+            const valorMin = document.getElementById('filter-valor-min').value.trim();
+            const valorMax = document.getElementById('filter-valor-max').value.trim();
+            
+            // Construir parâmetros da URL
+            const params = new URLSearchParams();
+            if (endereco) params.append('endereco', endereco);
+            if (tipo && tipo !== 'Todos') params.append('tipo', tipo);
+            if (status && status !== 'Todos') params.append('status', status);
+            if (valorMin) params.append('valor_min', valorMin);
+            if (valorMax) params.append('valor_max', valorMax);
+            params.append('format', format);
+            
+            // Fazer download
+            const url = `/api/imoveis/export?${params.toString()}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // Deixar o servidor definir o nome
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            utils.showAlert(`Exportação ${format.toUpperCase()} iniciada com sucesso!`, 'success');
+            
+        } catch (error) {
+            console.error('Erro na exportação:', error);
+            utils.showAlert('Erro ao exportar dados', 'error');
+        }
+    }
+
+    loadSortConfig() {
+        try {
+            const saved = localStorage.getItem('imoveis_sort_config');
+            return saved ? JSON.parse(saved) : undefined;
+        } catch (error) {
+            console.error('Erro ao carregar configuração de ordenação:', error);
+            return undefined;
+        }
+    }
+
+    saveSortConfig(config) {
+        try {
+            if (config && config.length > 0) {
+                localStorage.setItem('imoveis_sort_config', JSON.stringify(config));
+            } else {
+                localStorage.removeItem('imoveis_sort_config');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar configuração de ordenação:', error);
+        }
     }
 }
 

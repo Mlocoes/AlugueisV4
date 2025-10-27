@@ -180,3 +180,108 @@ def listar_participacoes_imovel(
         db, imovel_id, data_cadastro
     )
     return {"imovel_id": imovel_id, "participacoes": participacoes}
+
+@router.get("/export")
+def export_participacoes(
+    imovel: str = None,
+    proprietario: str = None,
+    format: str = "excel",
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Exportar participações filtradas para Excel ou CSV
+    """
+    from fastapi.responses import StreamingResponse
+    import io
+    import pandas as pd
+    from datetime import datetime
+    
+    # Aplicar filtros de permissão financeira
+    query = db.query(ParticipacaoModel)
+    query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    # Filtro por imóvel
+    if imovel:
+        try:
+            imovel_id = int(imovel)
+            query = query.filter(ParticipacaoModel.id_imovel == imovel_id)
+        except ValueError:
+            pass  # Ignorar se não for um ID válido
+    
+    # Filtro por proprietário
+    if proprietario:
+        try:
+            proprietario_id = int(proprietario)
+            query = query.filter(ParticipacaoModel.id_proprietario == proprietario_id)
+        except ValueError:
+            pass  # Ignorar se não for um ID válido
+    
+    participacoes = query.all()
+    
+    # Preparar dados para exportação
+    data = []
+    for participacao in participacoes:
+        # Buscar informações relacionadas
+        imovel_info = db.query(db.query(ParticipacaoModel).filter(ParticipacaoModel.id == participacao.id).first())
+        proprietario_info = db.query(Usuario).filter(Usuario.id == participacao.id_proprietario).first()
+        
+        # Corrigir a query do imóvel - preciso buscar da tabela imovel
+        from app.models.imovel import Imovel
+        imovel_info = db.query(Imovel).filter(Imovel.id == participacao.id_imovel).first()
+        
+        data.append({
+            'ID': participacao.id,
+            'Imóvel': imovel_info.endereco if imovel_info else '',
+            'Proprietário': proprietario_info.nome if proprietario_info else '',
+            'Percentual': float(participacao.percentual) if participacao.percentual else '',
+            'Data Início': participacao.data_inicio.strftime('%d/%m/%Y') if participacao.data_inicio else '',
+            'Data Fim': participacao.data_fim.strftime('%d/%m/%Y') if participacao.data_fim else '',
+            'Data Cadastro': participacao.data_cadastro.strftime('%d/%m/%Y') if participacao.data_cadastro else '',
+            'Ativo': 'Sim' if participacao.ativo else 'Não'
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Criar buffer para o arquivo
+    buffer = io.BytesIO()
+    
+    if format.lower() == "csv":
+        # Exportar como CSV
+        df.to_csv(buffer, index=False, encoding='utf-8-sig')
+        buffer.seek(0)
+        
+        filename = f"participacoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    
+    else:
+        # Exportar como Excel
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Participações', index=False)
+            
+            # Ajustar largura das colunas
+            worksheet = writer.sheets['Participações']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)  # Máximo 50 caracteres
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        buffer.seek(0)
+        
+        filename = f"participacoes_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )

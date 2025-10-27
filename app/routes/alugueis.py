@@ -294,3 +294,118 @@ def update_aluguel_mensal(
     db.commit()
     db.refresh(db_aluguel)
     return db_aluguel
+
+@router.get("/export")
+def export_alugueis(
+    imovel: str = None,
+    status: str = None,
+    mes: str = None,
+    format: str = "excel",
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(get_current_active_user)
+):
+    """
+    Exportar aluguéis filtrados para Excel ou CSV
+    """
+    from fastapi.responses import StreamingResponse
+    import io
+    import pandas as pd
+    from datetime import datetime
+    
+    # Aplicar filtros de permissão financeira
+    query = db.query(AluguelMensalModel)
+    query = filter_by_permissions(query, current_user, db, 'id_proprietario')
+    
+    # Filtro por imóvel
+    if imovel:
+        try:
+            imovel_id = int(imovel)
+            query = query.filter(AluguelMensalModel.id_imovel == imovel_id)
+        except ValueError:
+            pass  # Ignorar se não for um ID válido
+    
+    # Filtro por status
+    if status and status != "Todos":
+        query = query.filter(AluguelMensalModel.status == status)
+    
+    # Filtro por mês de referência
+    if mes:
+        try:
+            # Formato esperado: YYYY-MM
+            ano, mes_num = mes.split('-')
+            query = query.filter(
+                AluguelMensalModel.ano == int(ano),
+                AluguelMensalModel.mes == int(mes_num)
+            )
+        except ValueError:
+            pass  # Ignorar se formato inválido
+    
+    alugueis = query.all()
+    
+    # Preparar dados para exportação
+    data = []
+    for aluguel in alugueis:
+        # Buscar informações relacionadas
+        imovel_info = db.query(AluguelModel).filter(AluguelModel.id == aluguel.id_aluguel).first()
+        proprietario_info = None
+        if imovel_info:
+            proprietario_info = db.query(Usuario).filter(Usuario.id == imovel_info.id_proprietario).first()
+        
+        data.append({
+            'ID': aluguel.id,
+            'Imóvel': imovel_info.endereco if imovel_info else '',
+            'Proprietário': proprietario_info.nome if proprietario_info else '',
+            'Inquilino': aluguel.inquilino or '',
+            'Valor': float(aluguel.valor) if aluguel.valor else '',
+            'Dia Vencimento': aluguel.dia_vencimento,
+            'Mês Referência': f"{aluguel.ano:04d}-{aluguel.mes:02d}",
+            'Data Início': aluguel.data_inicio.strftime('%d/%m/%Y') if aluguel.data_inicio else '',
+            'Data Fim': aluguel.data_fim.strftime('%d/%m/%Y') if aluguel.data_fim else '',
+            'Status': aluguel.status or '',
+            'Data Criação': aluguel.created_at.strftime('%d/%m/%Y %H:%M') if aluguel.created_at else ''
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Criar buffer para o arquivo
+    buffer = io.BytesIO()
+    
+    if format.lower() == "csv":
+        # Exportar como CSV
+        df.to_csv(buffer, index=False, encoding='utf-8-sig')
+        buffer.seek(0)
+        
+        filename = f"alugueis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    
+    else:
+        # Exportar como Excel
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Aluguéis', index=False)
+            
+            # Ajustar largura das colunas
+            worksheet = writer.sheets['Aluguéis']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)  # Máximo 50 caracteres
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        buffer.seek(0)
+        
+        filename = f"alugueis_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )

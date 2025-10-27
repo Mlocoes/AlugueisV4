@@ -182,3 +182,107 @@ def delete_usuario(
     db.delete(db_usuario)
     db.commit()
     return {"message": "User deleted successfully"}
+
+@router.get("/export")
+def export_usuarios(
+    q: str = None,
+    tipo: str = None,
+    status: str = None,
+    format: str = "excel",
+    db: Session = Depends(get_db),
+    current_user: UsuarioModel = Depends(get_current_admin_user)
+):
+    """
+    Exportar usuários/proprietários filtrados para Excel ou CSV
+    """
+    from fastapi.responses import StreamingResponse
+    import io
+    import pandas as pd
+    from datetime import datetime
+    
+    # Aplicar filtros de permissão
+    query = db.query(UsuarioModel)
+    query = filter_inactive_records(query, current_user)
+    
+    # Filtro por tipo se especificado
+    if tipo and tipo != "Todos":
+        query = query.filter(UsuarioModel.tipo == tipo)
+    
+    # Filtro por status
+    if status and status != "Todos":
+        if status == "Ativo":
+            query = query.filter(UsuarioModel.ativo == True)
+        elif status == "Inativo":
+            query = query.filter(UsuarioModel.ativo == False)
+    
+    # Filtro por busca (nome, email, username)
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (UsuarioModel.nome.ilike(search_term)) |
+            (UsuarioModel.email.ilike(search_term)) |
+            (UsuarioModel.username.ilike(search_term))
+        )
+    
+    usuarios = query.all()
+    
+    # Preparar dados para exportação
+    data = []
+    for usuario in usuarios:
+        data.append({
+            'ID': usuario.id,
+            'Username': usuario.username or '',
+            'Nome': usuario.nome or '',
+            'Sobrenome': usuario.sobrenome or '',
+            'Email': usuario.email or '',
+            'Telefone': usuario.telefone or '',
+            'CPF/CNPJ': usuario.cpf_cnpj or '',
+            'Tipo': usuario.tipo or 'usuario',
+            'Status': 'Ativo' if usuario.ativo else 'Inativo',
+            'Data Criação': usuario.created_at.strftime('%d/%m/%Y %H:%M') if usuario.created_at else ''
+        })
+    
+    df = pd.DataFrame(data)
+    
+    # Criar buffer para o arquivo
+    buffer = io.BytesIO()
+    
+    if format.lower() == "csv":
+        # Exportar como CSV
+        df.to_csv(buffer, index=False, encoding='utf-8-sig')
+        buffer.seek(0)
+        
+        filename = f"usuarios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="text/csv",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    
+    else:
+        # Exportar como Excel
+        with pd.ExcelWriter(buffer, engine='openpyxl') as writer:
+            df.to_excel(writer, sheet_name='Usuários', index=False)
+            
+            # Ajustar largura das colunas
+            worksheet = writer.sheets['Usuários']
+            for column in worksheet.columns:
+                max_length = 0
+                column_letter = column[0].column_letter
+                for cell in column:
+                    try:
+                        if len(str(cell.value)) > max_length:
+                            max_length = len(str(cell.value))
+                    except:
+                        pass
+                adjusted_width = min(max_length + 2, 50)  # Máximo 50 caracteres
+                worksheet.column_dimensions[column_letter].width = adjusted_width
+        
+        buffer.seek(0)
+        
+        filename = f"usuarios_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        return StreamingResponse(
+            io.BytesIO(buffer.getvalue()),
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )

@@ -45,6 +45,20 @@ class ParticipacoesManager {
         document.getElementById('cancel-btn').addEventListener('click', () => this.hideModal());
         document.getElementById('participacao-form').addEventListener('submit', (e) => this.saveParticipacao(e));
         
+        // Export functionality
+        document.getElementById('export-btn').addEventListener('click', (e) => this.toggleExportDropdown(e));
+        document.getElementById('export-excel').addEventListener('click', (e) => this.exportData(e, 'excel'));
+        document.getElementById('export-csv').addEventListener('click', (e) => this.exportData(e, 'csv'));
+        
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', (e) => {
+            const exportBtn = document.getElementById('export-btn');
+            const exportDropdown = document.getElementById('export-dropdown');
+            if (!exportBtn.contains(e.target) && !exportDropdown.contains(e.target)) {
+                exportDropdown.classList.add('hidden');
+            }
+        });
+        
         // Event listeners para filtros
         document.getElementById('clear-filters-btn').addEventListener('click', () => this.clearFilters());
         this.loadSavedFilters();
@@ -193,7 +207,17 @@ class ParticipacoesManager {
                 height: 500,
                 readOnly: true,
                 stretchH: 'all',
-                licenseKey: 'non-commercial-and-evaluation'
+                licenseKey: 'non-commercial-and-evaluation',
+                // Configuração de ordenação avançada
+                columnSorting: {
+                    sortEmptyCells: true,
+                    initialConfig: this.loadSortConfig(),
+                    headerAction: true,
+                    indicator: true
+                },
+                afterColumnSort: (currentSortConfig, destinationSortConfigs) => {
+                    this.saveSortConfig(currentSortConfig);
+                }
             });
 
         } catch (error) {
@@ -371,6 +395,68 @@ class ParticipacoesManager {
         } catch (error) {
             console.error('Erro ao excluir participação:', error);
             alert('Erro ao excluir participação. Tente novamente.');
+        }
+    }
+
+    toggleExportDropdown(e) {
+        e.preventDefault();
+        const dropdown = document.getElementById('export-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    async exportData(e, format) {
+        e.preventDefault();
+        
+        // Fechar dropdown
+        document.getElementById('export-dropdown').classList.add('hidden');
+        
+        try {
+            // Obter filtros atuais
+            const imovel = document.getElementById('filter-imovel').value;
+            const proprietario = document.getElementById('filter-proprietario').value;
+            
+            // Construir parâmetros da URL
+            const params = new URLSearchParams();
+            if (imovel) params.append('imovel', imovel);
+            if (proprietario) params.append('proprietario', proprietario);
+            params.append('format', format);
+            
+            // Fazer download
+            const url = `/api/participacoes/export?${params.toString()}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // Deixar o servidor definir o nome
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert(`Exportação ${format.toUpperCase()} iniciada com sucesso!`);
+            
+        } catch (error) {
+            console.error('Erro na exportação:', error);
+            alert('Erro ao exportar dados');
+        }
+    }
+
+    loadSortConfig() {
+        try {
+            const saved = localStorage.getItem('participacoes_sort_config');
+            return saved ? JSON.parse(saved) : undefined;
+        } catch (error) {
+            console.error('Erro ao carregar configuração de ordenação:', error);
+            return undefined;
+        }
+    }
+
+    saveSortConfig(config) {
+        try {
+            if (config && config.length > 0) {
+                localStorage.setItem('participacoes_sort_config', JSON.stringify(config));
+            } else {
+                localStorage.removeItem('participacoes_sort_config');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar configuração de ordenação:', error);
         }
     }
 }

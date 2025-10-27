@@ -51,7 +51,21 @@ class AlugueisManager {
         document.getElementById('cancel-btn').addEventListener('click', () => this.hideModal());
         document.getElementById('aluguel-form').addEventListener('submit', (e) => this.saveAluguel(e));
         
-        // Event listeners para filtros
+        // Export functionality
+        document.getElementById('export-btn').addEventListener('click', (e) => this.toggleExportDropdown(e));
+        document.getElementById('export-excel').addEventListener('click', (e) => this.exportData(e, 'excel'));
+        document.getElementById('export-csv').addEventListener('click', (e) => this.exportData(e, 'csv'));
+        
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', (e) => {
+            const exportBtn = document.getElementById('export-btn');
+            const exportDropdown = document.getElementById('export-dropdown');
+            if (!exportBtn.contains(e.target) && !exportDropdown.contains(e.target)) {
+                exportDropdown.classList.add('hidden');
+            }
+        });
+        
+        // Filtros
         document.getElementById('clear-filters-btn').addEventListener('click', () => this.clearFilters());
         this.loadSavedFilters();
         document.getElementById('filter-imovel').addEventListener('change', () => {
@@ -237,10 +251,20 @@ class AlugueisManager {
                 readOnly: !isAdmin,
                 stretchH: 'all',
                 licenseKey: 'non-commercial-and-evaluation',
+                // Configuração de ordenação avançada
+                columnSorting: {
+                    sortEmptyCells: true,
+                    initialConfig: this.loadSortConfig(),
+                    headerAction: true,
+                    indicator: true
+                },
                 afterChange: (changes, source) => {
                     if (source === 'edit' && isAdmin) {
                         this.handleCellChange(changes);
                     }
+                },
+                afterColumnSort: (currentSortConfig, destinationSortConfigs) => {
+                    this.saveSortConfig(currentSortConfig);
                 },
                     // Controlar readOnly por célula com base em permissão por proprietário
                     cells: function(row, col) {
@@ -543,6 +567,70 @@ class AlugueisManager {
         } catch (error) {
             console.error('Erro ao excluir aluguel:', error);
             alert('Erro ao excluir aluguel. Tente novamente.');
+        }
+    }
+
+    toggleExportDropdown(event) {
+        event.stopPropagation();
+        const dropdown = document.getElementById('export-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    async exportData(event, format) {
+        event.stopPropagation();
+
+        // Fechar dropdown
+        document.getElementById('export-dropdown').classList.add('hidden');
+        
+        try {
+            // Obter filtros atuais
+            const imovel = document.getElementById('filter-imovel').value;
+            const status = document.getElementById('filter-status').value;
+            const mes = document.getElementById('filter-mes').value;
+            
+            // Construir parâmetros da URL
+            const params = new URLSearchParams();
+            if (imovel) params.append('imovel', imovel);
+            if (status && status !== '') params.append('status', status);
+            if (mes) params.append('mes', mes);
+            params.append('format', format);
+            
+            // Fazer download
+            const url = `/api/alugueis/export?${params.toString()}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // Deixar o servidor definir o nome
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert(`Exportação ${format.toUpperCase()} iniciada com sucesso!`);
+            
+        } catch (error) {
+            console.error('Erro na exportação:', error);
+            alert('Erro ao exportar dados');
+        }
+    }
+
+    loadSortConfig() {
+        try {
+            const saved = localStorage.getItem('alugueis_sort_config');
+            return saved ? JSON.parse(saved) : undefined;
+        } catch (error) {
+            console.error('Erro ao carregar configuração de ordenação:', error);
+            return undefined;
+        }
+    }
+
+    saveSortConfig(config) {
+        try {
+            if (config && config.length > 0) {
+                localStorage.setItem('alugueis_sort_config', JSON.stringify(config));
+            } else {
+                localStorage.removeItem('alugueis_sort_config');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar configuração de ordenação:', error);
         }
     }
 }

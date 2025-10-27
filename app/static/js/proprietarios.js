@@ -43,6 +43,20 @@ class ProprietariosManager {
         document.getElementById('cancel-btn').addEventListener('click', () => this.hideModal());
         document.getElementById('proprietario-form').addEventListener('submit', (e) => this.saveProprietario(e));
         
+        // Export functionality
+        document.getElementById('export-btn').addEventListener('click', (e) => this.toggleExportDropdown(e));
+        document.getElementById('export-excel').addEventListener('click', (e) => this.exportData(e, 'excel'));
+        document.getElementById('export-csv').addEventListener('click', (e) => this.exportData(e, 'csv'));
+        
+        // Fechar dropdown ao clicar fora
+        document.addEventListener('click', (e) => {
+            const exportBtn = document.getElementById('export-btn');
+            const exportDropdown = document.getElementById('export-dropdown');
+            if (!exportBtn.contains(e.target) && !exportDropdown.contains(e.target)) {
+                exportDropdown.classList.add('hidden');
+            }
+        });
+        
         // Event listeners para filtros
         document.getElementById('clear-filters-btn').addEventListener('click', () => this.clearFilters());
         this.loadSavedFilters();
@@ -133,10 +147,20 @@ class ProprietariosManager {
                 readOnly: !isAdmin,
                 stretchH: 'all',
                 licenseKey: 'non-commercial-and-evaluation',
+                // Configuração de ordenação avançada
+                columnSorting: {
+                    sortEmptyCells: true,
+                    initialConfig: this.loadSortConfig(),
+                    headerAction: true,
+                    indicator: true
+                },
                 afterChange: (changes, source) => {
                     if (source === 'edit' && isAdmin) {
                         this.handleCellChange(changes);
                     }
+                },
+                afterColumnSort: (currentSortConfig, destinationSortConfigs) => {
+                    this.saveSortConfig(currentSortConfig);
                 },
                 cells: function(row, col) {
                     const cellProperties = {};
@@ -392,6 +416,68 @@ class ProprietariosManager {
         } catch (error) {
             console.error('Erro ao excluir proprietário:', error);
             alert('Erro ao excluir proprietário. Tente novamente.');
+        }
+    }
+
+    toggleExportDropdown(e) {
+        e.preventDefault();
+        const dropdown = document.getElementById('export-dropdown');
+        dropdown.classList.toggle('hidden');
+    }
+
+    async exportData(e, format) {
+        e.preventDefault();
+        
+        // Fechar dropdown
+        document.getElementById('export-dropdown').classList.add('hidden');
+        
+        try {
+            // Obter filtros atuais
+            const nome = document.getElementById('search-nome').value.trim();
+            const status = document.getElementById('filter-status').value;
+            
+            // Construir parâmetros da URL
+            const params = new URLSearchParams();
+            if (nome) params.append('q', nome);
+            if (status && status !== '') params.append('status', status === 'ativo' ? 'Ativo' : 'Inativo');
+            params.append('format', format);
+            
+            // Fazer download
+            const url = `/api/usuarios/export?${params.toString()}`;
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = ''; // Deixar o servidor definir o nome
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert(`Exportação ${format.toUpperCase()} iniciada com sucesso!`);
+            
+        } catch (error) {
+            console.error('Erro na exportação:', error);
+            alert('Erro ao exportar dados');
+        }
+    }
+
+    loadSortConfig() {
+        try {
+            const saved = localStorage.getItem('proprietarios_sort_config');
+            return saved ? JSON.parse(saved) : undefined;
+        } catch (error) {
+            console.error('Erro ao carregar configuração de ordenação:', error);
+            return undefined;
+        }
+    }
+
+    saveSortConfig(config) {
+        try {
+            if (config && config.length > 0) {
+                localStorage.setItem('proprietarios_sort_config', JSON.stringify(config));
+            } else {
+                localStorage.removeItem('proprietarios_sort_config');
+            }
+        } catch (error) {
+            console.error('Erro ao salvar configuração de ordenação:', error);
         }
     }
 }
