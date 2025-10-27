@@ -6,6 +6,7 @@ from .alias import Alias
 from .alias_proprietario import AliasProprietario
 from .transferencia import Transferencia
 from .permissao_financeira import PermissaoFinanceira
+from .backup import Backup
 
 __all__ = [
     "Usuario",
@@ -16,5 +17,6 @@ __all__ = [
     "Alias",
     "AliasProprietario",
     "Transferencia",
-    "PermissaoFinanceira"
+    "PermissaoFinanceira",
+    "Backup"
 ]

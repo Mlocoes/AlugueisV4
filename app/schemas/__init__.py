@@ -222,14 +222,10 @@ class PermissaoFinanceira(PermissaoFinanceiraBase):
     class Config:
         from_attributes = True
 
-
 # Schema de saída enriquecida para permissões financeiras (inclui nomes)
 class PermissaoFinanceiraOut(PermissaoFinanceira):
     usuario_nome: Optional[str] = None
     proprietario_nome: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 # Schemas de autenticação
 class Token(BaseModel):
@@ -242,3 +238,21 @@ class TokenData(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+
+# Schemas de Backup
+class BackupBase(BaseModel):
+    tipo: str = Field(..., max_length=50)
+    arquivo: str = Field(..., max_length=255)
+    tamanho: int
+    descricao: Optional[str] = None
+
+class BackupCreate(BaseModel):
+    tipo: str = Field(..., max_length=50)
+    descricao: Optional[str] = None
+
+class Backup(BackupBase):
+    id: int
+    data_criacao: datetime
+
+    class Config:
+        from_attributes = True

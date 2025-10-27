@@ -14,12 +14,27 @@ router = APIRouter()
 def read_usuarios(
     skip: int = 0,
     limit: int = 100,
+    q: str = None,
+    tipo: str = None,
     db: Session = Depends(get_db),
     current_user: Usuario = Depends(get_current_admin_user)  # Só admin pode listar usuários
 ):
     # Aplicar filtros de permissão
     query = db.query(UsuarioModel)
     query = filter_inactive_records(query, current_user)
+    
+    # Filtro por tipo se especificado
+    if tipo:
+        query = query.filter(UsuarioModel.tipo == tipo)
+    
+    # Filtro por busca (nome, email, username)
+    if q:
+        search_term = f"%{q}%"
+        query = query.filter(
+            (UsuarioModel.nome.ilike(search_term)) |
+            (UsuarioModel.email.ilike(search_term)) |
+            (UsuarioModel.username.ilike(search_term))
+        )
     
     usuarios = query.offset(skip).limit(limit).all()
     

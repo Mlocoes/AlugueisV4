@@ -7,7 +7,7 @@ from app.core.auth import get_current_active_user
 from app.core.config import settings
 from app.core.config import APP_ENV
 from app.core.database import engine, Base
-from app.routes import auth, usuarios, imoveis, participacoes, alugueis, alias, transferencias, permissoes_financeiras, dashboard, import_routes, relatorios
+from app.routes import auth, usuarios, imoveis, participacoes, alugueis, alias, transferencias, permissoes_financeiras, dashboard, import_routes, relatorios, backup
 
 # Criar tabelas
 Base.metadata.create_all(bind=engine)
@@ -56,6 +56,7 @@ app.include_router(alugueis.router, prefix="/api/alugueis", tags=["Aluguéis"])
 app.include_router(alias.router, prefix="/api/alias", tags=["Aliás"])
 app.include_router(transferencias.router, prefix="/api/transferencias", tags=["Transferências"])
 app.include_router(permissoes_financeiras.router, prefix="/api/permissoes_financeiras", tags=["Permissões Financeiras"])
+app.include_router(backup.router, prefix="/api/admin/backup", tags=["Backup"])
 app.include_router(dashboard.router, prefix="/api/dashboard", tags=["Dashboard"])
 app.include_router(import_routes.router, prefix="/api/importacao", tags=["Importação"])
 app.include_router(relatorios.router, prefix="/api/relatorios", tags=["Relatórios"])
