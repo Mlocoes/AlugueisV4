@@ -1,6 +1,6 @@
 # 🎯 PROGRESSO DA IMPLEMENTAÇÃO - Sistema de Gestão de Aluguéis V4
 
-## 📊 Status Geral: 90% Completo
+## 📊 Status Geral: 95% Completo
 
 ---
 
@@ -249,7 +249,8 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 
 #### Filtros Avançados
 - ✅ Filtros múltiplos simultâneos - **IMPLEMENTADO**
-- [ ] Salvamento de filtros favoritos - **IMPLEMENTADO**
+- ✅ Salvamento de filtros favoritos - **IMPLEMENTADO**
+- ✅ Filtros por data de criação (de/até) - **IMPLEMENTADO**
 - [ ] Exportação de dados filtrados
 - [ ] Ordenação avançada
 
@@ -257,10 +258,11 @@ WHERE AluguelMensal.valor_total > 0  -- Só positivos
 - **Validação Inline:** Verificação de campos obrigatórios, tipos válidos, limites de valores
 - **Feedback Visual:** Células ficam verdes/vermelhas com indicadores ✓/✗ durante salvamento
 - **Salvamento Automático:** Delay de 500ms após sair da célula
-- **Filtros Avançados:** Endereço, tipo, status, valor mínimo/máximo
+- **Filtros Avançados:** Endereço, tipo, status, valor mínimo/máximo, **data de criação**
 - **Busca Combinada:** Pesquisa por endereço E nome simultaneamente
 - **Contador de Resultados:** Mostra quantos imóveis foram encontrados
 - **Persistência de Filtros:** Filtros salvos no localStorage
+- **Filtros de Data:** Campos de data de/até para proprietários e participações
 
 ### Versão 1.4 - Dashboard Interativo (FUTURO)
 
