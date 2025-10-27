@@ -110,6 +110,12 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
 
 @router.get("/charts")
 def get_dashboard_charts(db: Session = Depends(get_db), current_user: Usuario = Depends(get_current_active_user)):
+    # Verificar permissões de acesso aos proprietários
+    permitted = None
+    if current_user.tipo != 'administrador':
+        from app.core.permissions import get_permitted_proprietarios
+        permitted = get_permitted_proprietarios(current_user, db)
+    
     # Dados para gráficos do dashboard
     from app.models.imovel import Imovel
     from app.models.aluguel import AluguelMensal

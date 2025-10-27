@@ -45,7 +45,7 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 templates = Jinja2Templates(directory="app/templates")
 
 # Incluir rotas
-app.include_router(auth.router, prefix="/auth", tags=["Autenticação"])
+app.include_router(auth.router, prefix="/api/auth", tags=["Autenticação"])
 app.include_router(usuarios.router, prefix="/api/usuarios", tags=["Usuários"])
 app.include_router(imoveis.router, prefix="/api/imoveis", tags=["Imóveis"])
 app.include_router(participacoes.router, prefix="/api/participacoes", tags=["Participações"])

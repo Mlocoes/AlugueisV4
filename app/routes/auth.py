@@ -57,6 +57,29 @@ async def login_for_access_token(
     return response
 
 
+@router.post("/login/json", response_model=Token)
+async def login_json(
+    user_credentials: UserLogin, db: Session = Depends(get_db)
+):
+    """Autentica o usuário via JSON e retorna token de acesso.
+
+    Esta rota é compatível com requisições JSON do frontend.
+    """
+    user = authenticate_user(db, user_credentials.username, user_credentials.password)
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect username or password",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    access_token_expires = timedelta(minutes=settings.access_token_expire_minutes)
+    access_token = create_access_token(
+        data={"sub": user.username}, expires_delta=access_token_expires
+    )
+
+    return {"access_token": access_token, "token_type": "bearer"}
+
+
 @router.get("/me", response_model=Usuario)
 async def read_users_me(current_user: Usuario = Depends(get_current_active_user)):
     return current_user

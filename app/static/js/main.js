@@ -3,9 +3,10 @@
 // ApiClient class for handling API requests
 class ApiClient {
     constructor() {
-        this.baseURL = window.location.origin;
-    // Com cookies HttpOnly não mantemos token no cliente
-    this.token = null;
+        // Usar porta 8003 para evitar conflitos
+        this.baseURL = window.location.protocol + '//' + window.location.hostname + ':8003';
+        // Usar localStorage para armazenar o token JWT
+        this.token = localStorage.getItem('access_token');
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento
         
         // Verificar token periodicamente (a cada 5 minutos)
@@ -15,9 +16,8 @@ class ApiClient {
     }
 
     getToken() {
-        // Antigo comportamento: token era armazenado no localStorage/sessionStorage.
-        // Agora usamos cookies HttpOnly, portanto o cliente não pode ler o token.
-        return null;
+        // Retornar token do localStorage
+        return localStorage.getItem('access_token');
     }
 
     setToken(token, remember = false) {
@@ -43,7 +43,8 @@ class ApiClient {
         }
 
         if (this.token) {
-        // Requisições deverão usar cookies para autenticação; não injetamos header Authorization
+            // Usar token do localStorage para autenticação via header Authorization
+            config.headers['Authorization'] = `Bearer ${this.token}`;
         }
 
         if (config.body && typeof config.body === 'object' && !(config.body instanceof FormData)) {
@@ -79,8 +80,7 @@ class ApiClient {
                 if (!window.location.pathname.includes('/login')) {
                     this.isRedirecting = true;
                     // Limpar token
-                    localStorage.removeItem('token');
-                    sessionStorage.removeItem('token');
+                    localStorage.removeItem('access_token');
                     this.token = null;
                     // Delay para evitar throttling
                     setTimeout(() => {
@@ -127,44 +127,41 @@ class ApiClient {
             'username': username,
             'password': password
         };
-        const formBody = Object.keys(details).map(key => 
-            encodeURIComponent(key) + '=' + encodeURIComponent(details[key])).join('&');
 
-        // O servidor agora setará um cookie HttpOnly; a resposta JSON é apenas indicativa
-        const response = await this.request('/auth/login', {
+        // Usar JSON para compatibilidade com a API
+        const response = await this.request('/api/auth/login/json', {
             method: 'POST',
             headers: {
-                'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8'
+                'Content-Type': 'application/json'
             },
-            body: formBody
+            body: JSON.stringify(details)
         });
+        
+        // Armazenar o token retornado
+        if (response.access_token) {
+            localStorage.setItem('access_token', response.access_token);
+            this.token = response.access_token;
+        }
+        
         return response;
     }
 
     async logout() {
         // Para logout, pedir ao backend para limpar cookie e limpar dados locais
         try {
-            await this.post('/auth/logout');
+            await this.post('/api/auth/logout');
         } catch (e) {
             // ignore
         }
-        localStorage.removeItem('userRole');
-        localStorage.removeItem('userName');
+        
+        // Limpar token local
+        localStorage.removeItem('access_token');
         this.token = null;
-        this.userRole = null;
-        this.userName = null;
-        console.log('Logout realizado - cookies e dados locais removidos');
-        // Redirecionar para a página de login para limpar a UI
-        try {
-            window.location.href = '/login';
-        } catch (e) {
-            // ignore
-        }
     }
 
     async getCurrentUser() {
         try {
-            const user = await this.get('/auth/me');
+            const user = await this.get('/api/auth/me');
             // Armazenar informações do usuário
             if (user) {
                 localStorage.setItem('userRole', user.tipo);
@@ -232,7 +229,7 @@ class ApiClient {
         
         try {
             // Tentar fazer uma requisição simples para verificar se o token é válido
-            await this.get('/auth/me');
+            await this.get('/api/auth/me');
             return true;
         } catch (error) {
             if (error.message.includes('401') || error.message.includes('Sessão expirada')) {
@@ -256,7 +253,7 @@ class ApiClient {
         // Como o token não é compartilhado com o cliente,
         // apenas chamamos /auth/refresh periodicamente para que o servidor renove o cookie quando necessário.
         try {
-            await this.post('/auth/refresh');
+            await this.post('/api/auth/refresh');
         } catch (error) {
             // Falhas silenciosas serão tratadas por chamadas que retornarem 401
             // (não tentar setar header Authorization porque token é HttpOnly)
@@ -517,8 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const logoutBtnMobile = document.getElementById('logout-btn-mobile');
     if (logoutBtnMobile) {
         logoutBtnMobile.addEventListener('click', function() {
-            localStorage.removeItem('token');
-            sessionStorage.removeItem('token');
+            localStorage.removeItem('access_token');
             window.location.href = '/login';
         });
     }
