@@ -71,6 +71,17 @@ class AdministracaoManager {
     const propSearch = document.getElementById('perm-prop-search');
     const propList = document.getElementById('perm-prop-list');
     if (propSearch) propSearch.addEventListener('input', (e) => this.searchProprietarios(e.target.value, propList, 'perm-prop-id', 'perm-prop-search'));
+    const addPropBtn = document.getElementById('perm-add-prop-btn');
+    if (addPropBtn) addPropBtn.addEventListener('click', () => this.addTargetFromInput());
+
+    // Delegated listener para remover targets
+    const permTargets = document.getElementById('perm-targets');
+    if (permTargets) permTargets.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-remove-target]');
+        if (btn) this.removeTarget(btn);
+    });
+
+    if (propSearch) propSearch.addEventListener('focus', () => this.clearPermError());
         document.getElementById('close-user-modal-btn').addEventListener('click', () => this.hideUserModal());
         document.getElementById('cancel-user-btn').addEventListener('click', () => this.hideUserModal());
         document.getElementById('user-form').addEventListener('submit', (e) => this.saveUser(e));
@@ -216,11 +227,19 @@ class AdministracaoManager {
                 this.permissoesTable.destroy();
             }
 
-            const data = perms.map(p => [p.id, p.id_usuario, p.id_proprietario, p.visualizar ? 'Sim' : 'Não', p.editar ? 'Sim' : 'Não', 'Editar | Excluir']);
+            // Mostrar nomes quando disponíveis; fallback para IDs
+            const data = perms.map(p => [
+                p.id,
+                p.usuario_nome || p.id_usuario,
+                p.proprietario_nome || p.id_proprietario,
+                p.visualizar ? 'Sim' : 'Não',
+                p.editar ? 'Sim' : 'Não',
+                'Editar | Excluir'
+            ]);
 
             this.permissoesTable = new Handsontable(container, {
                 data: data,
-                colHeaders: ['ID', 'ID Usuário', 'ID Proprietário', 'Visualizar', 'Editar', 'Ações'],
+                colHeaders: ['ID', 'Usuário', 'Proprietário', 'Visualizar', 'Editar', 'Ações'],
                 columns: [
                     { type: 'text', readOnly: true },
                     { type: 'text' },
@@ -250,14 +269,22 @@ class AdministracaoManager {
         }
     }
 
-    editPerm(id) {
+    async editPerm(id) {
         // Abrir modal de edição - simplificado: redirecionar para admin page ou usar prompt
         const newVisualizar = confirm('Deseja ativar a permissão de visualizar? OK=Sim, Cancel=Nao');
         const newEditar = confirm('Deseja ativar a permissão de editar? OK=Sim, Cancel=Nao');
 
-        this.apiClient.put(`/api/permissoes_financeiras/${id}`, { visualizar: newVisualizar, editar: newEditar })
-            .then(() => { this.loadPermissoes(); alert('Permissão atualizada'); })
-            .catch(err => { console.error(err); alert('Erro ao atualizar permissão'); });
+        try {
+            await this.apiClient.put(`/api/permissoes_financeiras/${id}`, { visualizar: newVisualizar, editar: newEditar });
+            // Atualizar cache de permissões e UI
+            try { await this.apiClient.getMyPermissions(true); } catch(e) { /* ignore */ }
+            await this.loadPermissoes();
+            await this.loadUsuarios();
+            alert('Permissão atualizada');
+        } catch (err) {
+            console.error(err);
+            alert('Erro ao atualizar permissão');
+        }
     }
 
     async deletePerm(id) {
@@ -265,6 +292,13 @@ class AdministracaoManager {
         try {
             await this.apiClient.delete(`/api/permissoes_financeiras/${id}`);
             await this.loadPermissoes();
+            // Recarregar lista de usuários para evitar estado desatualizado
+            try {
+                await this.loadUsuarios();
+            } catch (e) {
+                // Não bloquear a UX se falhar em recarregar usuários
+                console.warn('Falha ao recarregar usuários após excluir permissão:', e);
+            }
             alert('Permissão excluída');
         } catch (error) {
             console.error('Erro ao excluir permissão:', error);
@@ -278,14 +312,17 @@ class AdministracaoManager {
         const id_proprietario = parseInt(prompt('ID do proprietário:', ''), 10);
         if (!id_usuario || !id_proprietario) { alert('IDs inválidos'); return; }
 
-        try {
-            await this.apiClient.post('/api/permissoes_financeiras/', { id_usuario, id_proprietario, visualizar: true, editar: false });
-            await this.loadPermissoes();
-            alert('Permissão criada');
-        } catch (error) {
-            console.error('Erro ao criar permissão:', error);
-            alert('Erro ao criar permissão.');
-        }
+            try {
+                await this.apiClient.post('/api/permissoes_financeiras/', { id_usuario, id_proprietario, visualizar: true, editar: false });
+                // Atualizar cache de permissões e UI
+                try { await this.apiClient.getMyPermissions(true); } catch(e) { /* ignore */ }
+                await this.loadPermissoes();
+                await this.loadUsuarios();
+                alert('Permissão criada');
+            } catch (error) {
+                console.error('Erro ao criar permissão:', error);
+                alert('Erro ao criar permissão.');
+            }
     }
 
     showPermModal(existing = null) {
@@ -383,6 +420,62 @@ class AdministracaoManager {
         }
     }
 
+    // Gerenciar targets (lista de proprietários selecionados para permissões em lote)
+    getTargets() {
+        const container = document.getElementById('perm-targets');
+        const items = Array.from(container.querySelectorAll('[data-target-id]'));
+        return items.map(el => ({
+            id_proprietario: parseInt(el.getAttribute('data-target-id'), 10),
+            visualizar: el.querySelector('.target-visualizar').checked,
+            editar: el.querySelector('.target-editar').checked
+        }));
+    }
+
+    addTargetFromInput() {
+        const id = document.getElementById('perm-prop-id').value;
+        const label = document.getElementById('perm-prop-search').value;
+        if (!id) {
+            this.showPermError('Selecione um proprietário válido antes de adicionar.');
+            return;
+        }
+
+        const container = document.getElementById('perm-targets');
+        // evitar duplicatas
+        if (container.querySelector(`[data-target-id="${id}"]`)) {
+            this.showPermError('Proprietário já adicionado à lista.');
+            return;
+        }
+
+        const div = document.createElement('div');
+        div.className = 'flex items-center justify-between p-2 border rounded';
+        div.setAttribute('data-target-id', id);
+        div.innerHTML = `
+            <div>${label}</div>
+            <div class="flex items-center space-x-2">
+                <label class="flex items-center"><input type="checkbox" class="target-visualizar h-4 w-4" checked> <span class="ml-2 text-sm">Visualizar</span></label>
+                <label class="flex items-center"><input type="checkbox" class="target-editar h-4 w-4"> <span class="ml-2 text-sm">Editar</span></label>
+                <button type="button" class="text-red-600 ml-2" data-remove-target>Remover</button>
+            </div>
+        `;
+
+        container.appendChild(div);
+
+        // limpar input
+        document.getElementById('perm-prop-id').value = '';
+        document.getElementById('perm-prop-search').value = '';
+        this.clearPermError();
+    }
+
+    clearPermError() {
+        const c = document.getElementById('perm-error');
+        if (c) c.innerHTML = '';
+    }
+
+    removeTarget(el) {
+        const parent = el.closest('[data-target-id]');
+        if (parent) parent.remove();
+    }
+
     async savePerm(event) {
         event.preventDefault();
         const id = document.getElementById('perm-id').value;
@@ -398,14 +491,27 @@ class AdministracaoManager {
         }
 
         try {
-            if (id) {
+            const targets = this.getTargets();
+
+            if (!id && targets.length > 0) {
+                // Criação em lote
+                const payload = {
+                    id_usuario: id_usuario,
+                    targets: targets.map(t => ({ id_proprietario: t.id_proprietario, visualizar: t.visualizar, editar: t.editar }))
+                };
+                await this.apiClient.post('/api/permissoes_financeiras/bulk', payload);
+            } else if (id) {
                 await this.apiClient.put(`/api/permissoes_financeiras/${id}`, { visualizar, editar });
             } else {
+                // fallback single
                 await this.apiClient.post('/api/permissoes_financeiras/', { id_usuario, id_proprietario, visualizar, editar });
             }
 
             this.hidePermModal();
+            // Atualizar cache de permissões e UI
+            try { await this.apiClient.getMyPermissions(true); } catch(e) { /* ignore */ }
             await this.loadPermissoes();
+            try { await this.loadUsuarios(); } catch(e) { /* ignore */ }
             // Opcional: mostrar notificación
             utils.showAlert('Permissão salva com sucesso', 'success');
         } catch (error) {

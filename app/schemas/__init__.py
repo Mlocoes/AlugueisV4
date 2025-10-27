@@ -203,9 +203,30 @@ class PermissaoFinanceiraUpdate(BaseModel):
     visualizar: Optional[bool] = None
     editar: Optional[bool] = None
 
+
+# Schema para criação em lote de permissões
+class PermissaoTarget(BaseModel):
+    id_proprietario: int
+    visualizar: bool = True
+    editar: bool = False
+
+
+class PermissaoFinanceiraBulkCreate(BaseModel):
+    id_usuario: int
+    targets: List[PermissaoTarget]
+
 class PermissaoFinanceira(PermissaoFinanceiraBase):
     id: int
     data_criacao: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Schema de saída enriquecida para permissões financeiras (inclui nomes)
+class PermissaoFinanceiraOut(PermissaoFinanceira):
+    usuario_nome: Optional[str] = None
+    proprietario_nome: Optional[str] = None
 
     class Config:
         from_attributes = True
