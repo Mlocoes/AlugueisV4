@@ -9,9 +9,6 @@ from app.core.config import APP_ENV
 from app.core.database import engine, Base
 from app.routes import auth, usuarios, imoveis, participacoes, alugueis, alias, transferencias, permissoes_financeiras, dashboard, import_routes, relatorios, backup
 
-# Criar tabelas
-Base.metadata.create_all(bind=engine)
-
 app = FastAPI(
     title="Sistema de Aluguéis",
     description="Sistema completo para gestão de imóveis e aluguéis",
