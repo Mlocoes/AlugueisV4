@@ -378,39 +378,35 @@ O sistema utiliza **JWT (JSON Web Tokens)** para autenticação:
    Authorization: Bearer <seu-token-aqui>
    ```
 
-**Desenvolvimento**: Login automático habilitado com `admin/123`
+**Desenvolvimento**: Usuários de teste criados localmente (ver `CREDENCIAIS_TESTE.md`) — por padrão use `admin` / `admin00` e `user` / `123456`.
 
-### Autenticação por Cookie HttpOnly (nova)
+### Autenticação (estado atual)
 
-A partir desta versão o fluxo de autenticação foi adaptado para usar um cookie HttpOnly chamado `access_token` em vez de confiar no armazenamento local do navegador. Principais pontos:
+O sistema usa tokens JWT. O frontend ARMAZENA O TOKEN EXCLUSIVAMENTE EM `sessionStorage` (comportamento desejado):
 
-- Em desenvolvimento o cookie é enviado com `SameSite=Lax` e `secure=false` para facilitar testes locais.
-- Em produção defina a variável de ambiente `APP_ENV=production` e **obrigatoriamente** configure `SECRET_KEY` e `ALLOWED_ORIGINS`.
-- Em produção o cookie será enviado com `Secure` além de `HttpOnly` e `SameSite=Lax`.
+- Após login (`POST /api/auth/login/json`) o `access_token` é guardado no `sessionStorage` e enviado no header `Authorization: Bearer <token>` nas requisições.
+- Navegação normal entre páginas NÃO limpa a sessão.
+- Qualquer recarga completa da página (F5) limpa o `sessionStorage` e exige novo login — isto é intencional e corresponde ao requisito funcional do projeto.
 
-Recomendações para deploy seguro:
+CSRF e segurança:
 
-- Exigir HTTPS no ambiente de produção (obrigatório para cookies `Secure`).
-- Configurar um domínio específico em `ALLOWED_ORIGINS` em vez de `*`.
-- Implementar proteção CSRF se você permitir requests state-changing a partir de navegadores externos. Uma opção simples é usar o padrão "double-submit cookie": gerar um CSRF token exposto ao JavaScript (não HttpOnly) e enviar como header nas requisições POST/PUT/DELETE.
+- Para chamadas mutativas (POST/PUT/DELETE) o frontend envia um token CSRF gerado no cliente (armazenado em `sessionStorage`) como header `X-CSRF-Token`. O backend valida esse token quando aplicável (padrão double-submit).
 
-Como testar localmente com curl:
+Recomendações de produção:
 
-```bash
-# Login e salvar cookies
-curl -c /tmp/cookies.txt -d "username=admin&password=admin123" http://localhost:8000/auth/login
+- Em produção use HTTPS e valide tokens no backend; considere um fluxo com cookies HttpOnly e refresh tokens se desejar persistência entre reloads (opção não adotada por este requisito).
+- Não confie no frontend para controle de acesso — o backend sempre valida permissões e tokens.
 
-# Usar cookie em requisição autenticada
-curl -b /tmp/cookies.txt http://localhost:8000/auth/me
+Como testar localmente:
 
-# Logout (cookie expirado pelo servidor)
-curl -b /tmp/cookies.txt -X POST http://localhost:8000/auth/logout
-```
+1. Inicie a aplicação e abra `http://localhost:8000/login`.
+2. Faça login com `admin` / `admin00`.
+3. Navegue por várias páginas — a sessão permanece.
+4. Pressione F5 em qualquer página — a sessão local é limpa e você será redirecionado para `/login`.
 
-Notas de migração:
+Notas:
 
-- O frontend já foi atualizado para enviar `credentials: 'include'` nas requisições e remover a lógica de salvar tokens no `localStorage`.
-- Se você possui scripts que usam tokens em headers, atualize-os para usar o cookie `access_token` ou manter o header Authorization como fallback (o servidor aceita ambos).
+- A implementação atual foi projetada para garantir que reloads do navegador não mantenham credenciais locais. Se você desejar uma estratégia diferente (tokens em cookies HttpOnly com refresh), eu posso ajudar a planejar e implementar essa mudança.
 
 ## 📈 Regras de Negócio
 
