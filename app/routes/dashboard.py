@@ -219,7 +219,7 @@ def get_recent_rentals(limit: int = 10, db: Session = Depends(get_db), current_u
         Imovel, AluguelMensal.id_imovel == Imovel.id
     ).join(
         Usuario, AluguelMensal.id_proprietario == Usuario.id
-    ).order_by(AluguelMensal.created_at.desc()).limit(limit)
+    ).order_by(AluguelMensal.criado_em.desc()).limit(limit)
     
     if permitted is not None:
         if permitted:
@@ -238,7 +238,7 @@ def get_recent_rentals(limit: int = 10, db: Session = Depends(get_db), current_u
             "valor_total": float(aluguel.valor_total) if aluguel.valor_total else 0,
             "data_referencia": aluguel.data_referencia.strftime("%d/%m/%Y") if aluguel.data_referencia else "",
             "status": aluguel.status or "N/A",
-            "created_at": aluguel.created_at.strftime("%d/%m/%Y %H:%M") if aluguel.created_at else ""
+            "created_at": aluguel.criado_em.strftime("%d/%m/%Y %H:%M") if aluguel.criado_em else ""
         })
     
     return result
