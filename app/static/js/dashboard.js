@@ -6,12 +6,10 @@ class DashboardManager {
         // Aguardar API estar pronta antes de inicializar
         if (window.apiClient) {
             this.apiClient = window.apiClient;
-            this.charts = {};
             this.init();
         } else {
             window.addEventListener('apiReady', (event) => {
                 this.apiClient = event.detail;
-                this.charts = {};
                 this.init();
             });
         }
@@ -653,7 +651,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const checkLibraries = () => {
         console.log('Verificando bibliotecas - Chart:', typeof Chart, 'Handsontable:', typeof Handsontable);
         if (typeof Chart !== 'undefined' && typeof Handsontable !== 'undefined') {
-            console.log('Bibliotecas carregadas, inicializando DashboardManager');
+            console.log('Bibliotecas carregadas, aguardando ApiClient...');
+            // DashboardManager será inicializado quando apiReady for disparado
             new DashboardManager();
         } else {
             console.log('Aguardando bibliotecas carregarem...');
