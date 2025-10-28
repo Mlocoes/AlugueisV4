@@ -19,6 +19,14 @@ class DashboardManager {
 
     async init() {
         console.log('DashboardManager.init() chamado');
+        
+        // Verificar se há token válido antes de prosseguir
+        if (!this.apiClient.token) {
+            console.log('Dashboard: Nenhum token encontrado, redirecionando para login');
+            window.location.href = '/login';
+            return;
+        }
+        
         // Verificar autenticação no carregamento — nunca realizar login automático
         await this.checkAuth();
         this.setupEventListeners();

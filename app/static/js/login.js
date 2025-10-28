@@ -1,4 +1,5 @@
 // Login JavaScript
+// Login JavaScript
 class LoginManager {
     constructor() {
         // Aguardar API estar pronta antes de inicializar
@@ -14,7 +15,7 @@ class LoginManager {
     }
 
     init() {
-        // Verificar autenticação apenas uma vez, sem causar loop
+        // Verificar autenticação para redirecionar se já estiver logado
         this.checkExistingToken();
         this.setupEventListeners();
     }
@@ -23,14 +24,13 @@ class LoginManager {
         const token = this.apiClient.getToken();
         if (token) {
             try {
-                const user = await this.apiClient.getCurrentUser();
+                await this.apiClient.getCurrentUser();
                 // Token válido, redirecionar para dashboard
                 window.location.href = '/';
             } catch (error) {
-                // Token inválido, limpar e permanecer na página
-                localStorage.removeItem('token');
-                sessionStorage.removeItem('token');
-                this.apiClient.token = null;
+                // Token inválido, limpar dados locais
+                console.log('Login: Token inválido encontrado, limpando dados');
+                this.apiClient.clearStoredAuth();
             }
         }
     }
@@ -78,17 +78,15 @@ class LoginManager {
             // Esconder mensagem de erro anterior
             errorMessage.classList.add('hidden');
 
+            // Limpar possíveis valores antigos do sessionStorage
+            sessionStorage.removeItem('userRole');
+            sessionStorage.removeItem('userName');
+
             // Fazer login
             console.log('Enviando requisição de login...');
             const response = await this.apiClient.login(username, password);
 
-            // O servidor definiu o cookie HttpOnly com o token; nós não podemos ler o token.
-            // Salvar apenas informações de UX (se houver) e redirecionar.
-            // Limpar possíveis valores antigos
-            localStorage.removeItem('userRole');
-            localStorage.removeItem('userName');
-
-            // Tentar obter /auth/me com retries curtos (o cookie é setado pelo servidor na resposta anterior)
+            // Tentar obter /auth/me com retries curtos
             let gotUser = false;
             for (let i = 0; i < 3; i++) {
                 try {

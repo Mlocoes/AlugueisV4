@@ -1,13 +1,13 @@
-// Main JavaScript file for the rental system
-
-// ApiClient class for handling API requests
 class ApiClient {
     constructor() {
         // Usar porta 8000 (porta correta do servidor)
         this.baseURL = window.location.protocol + '//' + window.location.hostname + ':8000';
-        // Usar localStorage para armazenar o token JWT
-        this.token = localStorage.getItem('access_token');
+        // Usar sessionStorage para armazenar o token JWT
+        this.token = sessionStorage.getItem('access_token');
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento
+        
+        // Verificar se o token ainda é válido na inicialização
+        this.validateStoredToken();
         
         // Verificar token periodicamente (a cada 5 minutos)
         setInterval(() => {
@@ -16,8 +16,8 @@ class ApiClient {
     }
 
     getToken() {
-        // Retornar token do localStorage
-        return localStorage.getItem('access_token');
+        // Retornar token do sessionStorage
+        return sessionStorage.getItem('access_token');
     }
 
     setToken(token, remember = false) {
@@ -43,7 +43,7 @@ class ApiClient {
         }
 
         if (this.token) {
-            // Usar token do localStorage para autenticação via header Authorization
+            // Usar token do sessionStorage para autenticação via header Authorization
             config.headers['Authorization'] = `Bearer ${this.token}`;
         }
 
@@ -58,7 +58,7 @@ class ApiClient {
             if (mutating.includes(method) && !(config.headers && (config.headers['X-CSRF-Token'] || config.headers['x-csrf-token']))) {
                 // Ler cookie csrf_token (não HttpOnly)
                 const getCookie = (name) => {
-                    const match = document.cookie.match(new RegExp('(^|;)\\s*' + name + '\\s*=\\s*([^;]+)'));
+                    const match = document.cookie.match(new RegExp('(^|;)\s*' + name + '\s*=\s*([^;]+)'));
                     return match ? decodeURIComponent(match.pop()) : null;
                 };
                 const csrf = getCookie('csrf_token');
@@ -79,9 +79,8 @@ class ApiClient {
                 // Token expirado, redirecionar para login apenas se não estiver na página de login
                 if (!window.location.pathname.includes('/login')) {
                     this.isRedirecting = true;
-                    // Limpar token
-                    localStorage.removeItem('access_token');
-                    this.token = null;
+                    // Limpar dados locais de autenticação
+                    this.clearStoredAuth();
                     // Delay para evitar throttling
                     setTimeout(() => {
                         window.location.href = '/login';
@@ -139,7 +138,7 @@ class ApiClient {
         
         // Armazenar o token retornado
         if (response.access_token) {
-            localStorage.setItem('access_token', response.access_token);
+            sessionStorage.setItem('access_token', response.access_token);
             this.token = response.access_token;
         }
         
@@ -154,9 +153,8 @@ class ApiClient {
             // ignore
         }
         
-        // Limpar token local
-        localStorage.removeItem('access_token');
-        this.token = null;
+        // Limpar dados locais de autenticação
+        this.clearStoredAuth();
     }
 
     async getCurrentUser() {
@@ -164,8 +162,8 @@ class ApiClient {
             const user = await this.get('/api/auth/me');
             // Armazenar informações do usuário
             if (user) {
-                localStorage.setItem('userRole', user.tipo);
-                localStorage.setItem('userName', user.nome);
+                sessionStorage.setItem('userRole', user.tipo);
+                sessionStorage.setItem('userName', user.nome);
                 this.userRole = user.tipo;
                 this.userName = user.nome;
             }
@@ -207,21 +205,21 @@ class ApiClient {
     }
 
     isAdmin() {
-        const role = localStorage.getItem('userRole') || this.userRole;
+        const role = sessionStorage.getItem('userRole') || this.userRole;
         return role === 'administrador';
     }
 
     isUsuario() {
-        const role = localStorage.getItem('userRole') || this.userRole;
+        const role = sessionStorage.getItem('userRole') || this.userRole;
         return role === 'usuario';
     }
 
     getUserName() {
-        return localStorage.getItem('userName') || this.userName || 'Usuário';
+        return sessionStorage.getItem('userName') || this.userName || 'Usuário';
     }
 
     getUserRole() {
-        return localStorage.getItem('userRole') || this.userRole || 'usuario';
+        return sessionStorage.getItem('userRole') || this.userRole || 'usuario';
     }
 
     async isTokenValid() {
@@ -231,7 +229,8 @@ class ApiClient {
             // Tentar fazer uma requisição simples para verificar se o token é válido
             await this.get('/api/auth/me');
             return true;
-        } catch (error) {
+        }
+        catch (error) {
             if (error.message.includes('401') || error.message.includes('Sessão expirada')) {
                 return false;
             }
@@ -258,6 +257,33 @@ class ApiClient {
             // Falhas silenciosas serão tratadas por chamadas que retornarem 401
             // (não tentar setar header Authorization porque token é HttpOnly)
         }
+    }
+
+    async validateStoredToken() {
+        // Se não há token armazenado, não há nada para validar
+        if (!this.token) {
+            return;
+        }
+
+        try {
+            // Tentar fazer uma requisição autenticada simples para validar o token
+            await this.get('/api/auth/me');
+            console.log('Token armazenado é válido');
+        } catch (error) {
+            console.warn('Token armazenado é inválido, limpando dados:', error.message);
+            // Token inválido, limpar dados locais
+            this.clearStoredAuth();
+        }
+    }
+
+    clearStoredAuth() {
+        // Limpar todos os dados de autenticação armazenados localmente
+        sessionStorage.removeItem('access_token');
+        sessionStorage.removeItem('userRole');
+        sessionStorage.removeItem('userName');
+        this.token = null;
+        this.userRole = null;
+        this.userName = null;
     }
 }
 
@@ -513,8 +539,10 @@ document.addEventListener('DOMContentLoaded', function() {
     // Logout functionality for mobile
     const logoutBtnMobile = document.getElementById('logout-btn-mobile');
     if (logoutBtnMobile) {
-        logoutBtnMobile.addEventListener('click', function() {
-            localStorage.removeItem('access_token');
+        logoutBtnMobile.addEventListener('click', async function() {
+            if (window.apiClient) {
+                await window.apiClient.logout();
+            }
             window.location.href = '/login';
         });
     }
