@@ -2,11 +2,13 @@ from fastapi import FastAPI, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
+from sqlalchemy.orm import Session
 from app.core.auth import get_current_active_user
 from app.core.config import settings
 from app.core.config import APP_ENV
-from app.core.database import engine, Base
+from app.core.database import engine, Base, get_db
+from app.models.usuario import Usuario
 from app.routes import auth, usuarios, imoveis, participacoes, alugueis, alias, transferencias, permissoes_financeiras, dashboard, import_routes, relatorios, backup
 
 app = FastAPI(
@@ -64,8 +66,33 @@ app.include_router(import_routes.router, prefix="/api/importacao", tags=["Import
 app.include_router(relatorios.router, prefix="/api/relatorios", tags=["Relatórios"])
 
 @app.get("/")
-async def root(request: Request):
-    return templates.TemplateResponse("dashboard.html", {"request": request})
+async def root(request: Request, db: Session = Depends(get_db)):
+    # Verificar se o usuário está autenticado verificando o cookie
+    access_token = request.cookies.get('access_token')
+    if not access_token:
+        # Redirecionar para login se não houver token
+        return RedirectResponse(url="/login", status_code=302)
+    
+    # Tentar validar o token
+    try:
+        # Decodificar e validar o token
+        from jose import jwt, JWTError
+        from app.core.config import settings
+        
+        payload = jwt.decode(access_token, settings.secret_key, algorithms=[settings.algorithm])
+        username: str = payload.get("sub")
+        if username is None:
+            return RedirectResponse(url="/login", status_code=302)
+        
+        # Verificar se o usuário existe e está ativo
+        user = db.query(Usuario).filter(Usuario.username == username).first()
+        if user is None or not user.ativo:
+            return RedirectResponse(url="/login", status_code=302)
+        
+        return templates.TemplateResponse("dashboard.html", {"request": request})
+    except JWTError:
+        # Token inválido, redirecionar para login
+        return RedirectResponse(url="/login", status_code=302)
 
 # Frontend routes
 @app.get("/login")

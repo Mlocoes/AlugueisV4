@@ -61,9 +61,9 @@ async def login_for_access_token(
 async def login_json(
     user_credentials: UserLogin, db: Session = Depends(get_db)
 ):
-    """Autentica o usuário via JSON e retorna token de acesso.
+    """Autentica o usuário via JSON e retorna token de acesso + define cookies.
 
-    Esta rota é compatível com requisições JSON do frontend.
+    Esta rota é compatível com requisições JSON do frontend e define cookies HttpOnly.
     """
     user = authenticate_user(db, user_credentials.username, user_credentials.password)
     if not user:
@@ -77,7 +77,24 @@ async def login_json(
         data={"sub": user.username}, expires_delta=access_token_expires
     )
 
-    return {"access_token": access_token, "token_type": "bearer"}
+    # Preparar cookie HttpOnly (igual à rota /login)
+    secure_cookie = APP_ENV == 'production'
+    cookie_params = {
+        'httponly': True,
+        'samesite': 'lax',
+        'secure': secure_cookie,
+        'max_age': settings.access_token_expire_minutes * 60,
+        'expires': settings.access_token_expire_minutes * 60,
+        'path': '/'
+    }
+
+    response = JSONResponse({"access_token": access_token, "token_type": "bearer"})
+    # Usar set_cookie do Starlette/Response
+    response.set_cookie(key='access_token', value=access_token, **cookie_params)
+    # Gerar CSRF token exposto ao cliente (não HttpOnly)
+    csrf_value = secrets.token_urlsafe(32)
+    response.set_cookie(key='csrf_token', value=csrf_value, httponly=False, samesite='lax', secure=secure_cookie, path='/', max_age=settings.access_token_expire_minutes * 60)
+    return response
 
 
 @router.get("/me", response_model=Usuario)
