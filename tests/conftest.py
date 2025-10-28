@@ -5,7 +5,7 @@ from sqlalchemy import create_engine
 # Configurar variables de entorno ANTES de importar la aplicación
 os.environ['DATABASE_URL'] = 'sqlite:///./test.db'
 os.environ['APP_ENV'] = 'test'
-
+os.environ['SECRET_KEY'] = 'a_test_secret' # Chave secreta para ambiente de teste
 # Ahora importar después de configurar las variables
 from fastapi.testclient import TestClient
 from app.main import app

@@ -112,10 +112,9 @@ class ParticipacaoService:
         
         soma_atual = sum(p.participacao for p in participacoes_existentes)
         soma_com_nova = soma_atual + participacao
-        
-        diferenca = abs(soma_com_nova - ParticipacaoService.TOTAL_ESPERADO)
-        
-        if diferenca > ParticipacaoService.TOLERANCIA:
+
+        # A validação deve falhar apenas se a nova soma EXCEDER o total esperado
+        if soma_com_nova > (ParticipacaoService.TOTAL_ESPERADO + ParticipacaoService.TOLERANCIA):
             raise HTTPException(
                 status_code=400,
                 detail={
@@ -123,11 +122,10 @@ class ParticipacaoService:
                     "soma_atual": float(soma_atual),
                     "nova_participacao": float(participacao),
                     "soma_resultante": float(soma_com_nova),
-                    "diferenca": float(diferenca),
                     "tolerancia": float(ParticipacaoService.TOLERANCIA),
                     "mensagem": (
                         f"Adicionar {participacao}% resultaria em {soma_com_nova}%, "
-                        f"ultrapassando a tolerância de ±{ParticipacaoService.TOLERANCIA}%"
+                        f"excedendo o limite de {ParticipacaoService.TOTAL_ESPERADO}%"
                     )
                 }
             )

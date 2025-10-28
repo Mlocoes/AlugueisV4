@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Timing</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .log { background: #f5f5f5; padding: 10px; margin: 5px 0; border-left: 3px solid #007cba; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+    </style>
+</head>
+<body>
+    <h1>Teste de Timing da Inicialização</h1>
+    <div id="logs"></div>
+
+    <script>
+        function log(message, type = 'info') {
+            const logsDiv = document.getElementById('logs');
+            const logEntry = document.createElement('div');
+            logEntry.className = `log ${type}`;
+            logEntry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            logsDiv.appendChild(logEntry);
+            console.log(message);
+        }
+
+        // Simular ApiClient
+        class MockApiClient {
+            constructor() {
+                this.token = sessionStorage.getItem('access_token');
+                log('ApiClient criado');
+            }
+
+            getToken() {
+                return this.token;
+            }
+
+            async get(endpoint) {
+                log(`ApiClient.get chamado: ${endpoint}`);
+                
+                // Simular resposta baseada no endpoint
+                if (endpoint === '/api/auth/me') {
+                    if (this.token) {
+                        // Simular token válido
+                        log('Token válido simulado');
+                        return { nome: 'Test User' };
+                    } else {
+                        // Simular token inválido
+                        log('Token inválido simulado');
+                        throw new Error('401 Unauthorized');
+                    }
+                }
+                
+                return {};
+            }
+
+            clearStoredAuth() {
+                sessionStorage.removeItem('access_token');
+                this.token = null;
+                log('Dados de autenticação limpos');
+            }
+        }
+
+        // Simular DashboardManager
+        class MockDashboardManager {
+            constructor() {
+                log('DashboardManager criado');
+                
+                // Aguardar API estar pronta antes de inicializar
+                if (window.apiClient) {
+                    this.apiClient = window.apiClient;
+                    log('ApiClient já disponível, inicializando imediatamente');
+                    this.init();
+                } else {
+                    log('Aguardando evento apiReady...');
+                    window.addEventListener('apiReady', (event) => {
+                        this.apiClient = event.detail;
+                        log('Evento apiReady recebido, inicializando...');
+                        this.init();
+                    });
+                }
+            }
+
+            async init() {
+                log('DashboardManager.init() chamado');
+                
+                // Verificação síncrona: se não há token, redirecionar imediatamente
+                const token = this.apiClient.getToken();
+                if (!token) {
+                    log('Dashboard: Nenhum token encontrado, redirecionando para login', 'error');
+                    // Em um teste real: window.location.href = '/login';
+                    return;
+                }
+                
+                log('Token encontrado, validando com servidor...');
+                
+                // Verificação assíncrona: validar se o token ainda é válido
+                try {
+                    await this.apiClient.get('/api/auth/me');
+                    log('Dashboard: Token válido, continuando...', 'success');
+                } catch (error) {
+                    log(`Dashboard: Token inválido, redirecionando para login: ${error.message}`, 'error');
+                    // Limpar dados inválidos
+                    this.apiClient.clearStoredAuth();
+                    // Em um teste real: window.location.href = '/login';
+                }
+            }
+        }
+
+        // Simular carregamento da página
+        log('Simulando carregamento da página...');
+        
+        // Simular DOMContentLoaded
+        setTimeout(() => {
+            log('DOMContentLoaded simulado');
+            
+            // Verificar se Chart.js está disponível (simular)
+            setTimeout(() => {
+                log('Bibliotecas carregadas, criando DashboardManager');
+                new MockDashboardManager();
+            }, 100);
+        }, 100);
+
+        // Simular ApiClient sendo criado depois
+        setTimeout(() => {
+            log('Criando ApiClient...');
+            window.apiClient = new MockApiClient();
+            
+            log('Disparando evento apiReady...');
+            window.dispatchEvent(new CustomEvent('apiReady', { detail: window.apiClient }));
+        }, 200);
+
+    </script>
+</body>
+</html>

@@ -1,4 +1,5 @@
 from sqlalchemy import Column, Integer, Numeric, Date, ForeignKey, TIMESTAMP, func, String
+from sqlalchemy.orm import relationship
 from app.core.database import Base
 
 class Aluguel(Base):
@@ -24,5 +25,9 @@ class AluguelMensal(Base):
     valor_total = Column(Numeric(12, 2), nullable=False)  # Valor total do aluguel do imóvel
     valor_proprietario = Column(Numeric(12, 2), nullable=False)  # Valor que cabe ao proprietário
     taxa_administracao = Column(Numeric(10, 2), default=0)  # Taxa de administração
-    criado_em = Column(TIMESTAMP, server_default=func.now())
+    status = Column(String, default="Não Pago") # Status do pagamento
+    created_at = Column(TIMESTAMP, server_default=func.now())
     atualizado_em = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
+
+    imovel = relationship("Imovel")
+    proprietario = relationship("Usuario")

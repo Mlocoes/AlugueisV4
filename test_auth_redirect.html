@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teste de Redirecionamento</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test { background: #f0f8ff; padding: 15px; margin: 10px 0; border-left: 4px solid #007cba; }
+        .success { border-left-color: #28a745; background: #d4edda; }
+        .error { border-left-color: #dc3545; background: #f8d7da; }
+    </style>
+</head>
+<body>
+    <h1>Teste de Redirecionamento de Autenticação</h1>
+    
+    <div class="test">
+        <h3>1. Teste sem token (deve redirecionar)</h3>
+        <p>Simulando: sessionStorage sem access_token</p>
+        <button onclick="testNoToken()">Testar</button>
+        <div id="result1"></div>
+    </div>
+    
+    <div class="test">
+        <h3>2. Teste com token inválido (deve redirecionar)</h3>
+        <p>Simulando: sessionStorage com token expirado</p>
+        <button onclick="testInvalidToken()">Testar</button>
+        <div id="result2"></div>
+    </div>
+    
+    <div class="test">
+        <h3>3. Teste com token válido (deve continuar)</h3>
+        <p>Simulando: sessionStorage com token válido</p>
+        <button onclick="testValidToken()">Testar</button>
+        <div id="result3"></div>
+    </div>
+
+    <script>
+        async function testNoToken() {
+            const result = document.getElementById('result1');
+            sessionStorage.removeItem('access_token');
+            
+            try {
+                const response = await fetch('/api/auth/me');
+                if (response.status === 401) {
+                    result.innerHTML = '<span class="success">✅ Correto: Redirecionamento esperado para token ausente</span>';
+                } else {
+                    result.innerHTML = '<span class="error">❌ Erro: Não redirecionou sem token</span>';
+                }
+            } catch (e) {
+                result.innerHTML = '<span class="error">❌ Erro na requisição: ' + e.message + '</span>';
+            }
+        }
+        
+        async function testInvalidToken() {
+            const result = document.getElementById('result2');
+            sessionStorage.setItem('access_token', 'invalid_token');
+            
+            try {
+                const response = await fetch('/api/auth/me');
+                if (response.status === 401) {
+                    result.innerHTML = '<span class="success">✅ Correto: Redirecionamento esperado para token inválido</span>';
+                } else {
+                    result.innerHTML = '<span class="error">❌ Erro: Não redirecionou com token inválido</span>';
+                }
+            } catch (e) {
+                result.innerHTML = '<span class="error">❌ Erro na requisição: ' + e.message + '</span>';
+            }
+        }
+        
+        async function testValidToken() {
+            const result = document.getElementById('result3');
+            
+            // Primeiro fazer login para obter token válido
+            try {
+                const loginResponse = await fetch('/api/auth/login/json', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username: 'admin', password: 'admin00' })
+                });
+                
+                if (loginResponse.ok) {
+                    const data = await loginResponse.json();
+                    sessionStorage.setItem('access_token', data.access_token);
+                    
+                    // Agora testar /me
+                    const meResponse = await fetch('/api/auth/me');
+                    if (meResponse.ok) {
+                        const user = await meResponse.json();
+                        result.innerHTML = '<span class="success">✅ Correto: Usuário autenticado - ' + user.nome + '</span>';
+                    } else {
+                        result.innerHTML = '<span class="error">❌ Erro: Token válido não funcionou</span>';
+                    }
+                } else {
+                    result.innerHTML = '<span class="error">❌ Erro no login para teste</span>';
+                }
+            } catch (e) {
+                result.innerHTML = '<span class="error">❌ Erro na requisição: ' + e.message + '</span>';
+            }
+        }
+    </script>
+</body>
+</html>

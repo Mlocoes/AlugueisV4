@@ -44,6 +44,11 @@ app.mount("/static", StaticFiles(directory="app/static"), name="static")
 # Configurar templates
 templates = Jinja2Templates(directory="app/templates")
 
+# Rota para favicon
+@app.get("/favicon.ico")
+async def favicon():
+    return FileResponse("app/static/favicon.svg", media_type="image/svg+xml")
+
 # Incluir rotas
 app.include_router(auth.router, prefix="/api/auth", tags=["Autenticação"])
 app.include_router(usuarios.router, prefix="/api/usuarios", tags=["Usuários"])

@@ -17,6 +17,9 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Etapa 2: Final - Cria a imagem de produção
 FROM python:3.11-slim
 
+# Instalar cliente PostgreSQL
+RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client && rm -rf /var/lib/apt/lists/*
+
 # Criar usuário não-root
 RUN groupadd -r appuser -g 1000 && useradd -r -g appuser -u 1000 appuser
 WORKDIR /app
