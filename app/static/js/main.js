@@ -6,9 +6,6 @@ class ApiClient {
         this.token = sessionStorage.getItem('access_token');
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento
         
-        // Verificar se o token ainda é válido na inicialização
-        this.validateStoredToken();
-        
         // Verificar token periodicamente (a cada 5 minutos)
         setInterval(() => {
             this.refreshTokenIfNeeded();
@@ -259,23 +256,6 @@ class ApiClient {
         }
     }
 
-    async validateStoredToken() {
-        // Se não há token armazenado, não há nada para validar
-        if (!this.token) {
-            return;
-        }
-
-        try {
-            // Tentar fazer uma requisição autenticada simples para validar o token
-            await this.get('/api/auth/me');
-            console.log('Token armazenado é válido');
-        } catch (error) {
-            console.warn('Token armazenado é inválido, limpando dados:', error.message);
-            // Token inválido, limpar dados locais
-            this.clearStoredAuth();
-        }
-    }
-
     clearStoredAuth() {
         // Limpar todos os dados de autenticação armazenados localmente
         sessionStorage.removeItem('access_token');
@@ -284,6 +264,13 @@ class ApiClient {
         this.token = null;
         this.userRole = null;
         this.userName = null;
+    }
+
+    async initValidation() {
+        // Aguardar um pouco para garantir que a página esteja carregada
+        setTimeout(async () => {
+            await this.validateStoredToken();
+        }, 100);
     }
 }
 

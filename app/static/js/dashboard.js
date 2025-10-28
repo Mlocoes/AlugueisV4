@@ -20,15 +20,27 @@ class DashboardManager {
     async init() {
         console.log('DashboardManager.init() chamado');
         
-        // Verificar se há token válido antes de prosseguir
-        if (!this.apiClient.token) {
+        // Verificação síncrona: se não há token, redirecionar imediatamente
+        const token = this.apiClient.getToken();
+        if (!token) {
             console.log('Dashboard: Nenhum token encontrado, redirecionando para login');
             window.location.href = '/login';
             return;
         }
         
-        // Verificar autenticação no carregamento — nunca realizar login automático
-        await this.checkAuth();
+        // Verificação assíncrona: validar se o token ainda é válido
+        try {
+            await this.apiClient.get('/api/auth/me');
+            console.log('Dashboard: Token válido, continuando...');
+        } catch (error) {
+            console.warn('Dashboard: Token inválido, redirecionando para login:', error.message);
+            // Limpar dados inválidos
+            this.apiClient.clearStoredAuth();
+            window.location.href = '/login';
+            return;
+        }
+        
+        // Token válido, continuar com inicialização normal
         this.setupEventListeners();
         await this.loadDashboardData();
         // Aplicar controle de acesso
