@@ -1,5 +1,7 @@
 // Login JavaScript
-// Login JavaScript
+// Credenciais de teste:
+// - Admin: admin / admin00
+// - User: user / 123456
 class LoginManager {
     constructor() {
         // Aguardar API estar pronta antes de inicializar

@@ -2,7 +2,7 @@ class ApiClient {
     constructor() {
         // Usar porta 8000 (porta correta do servidor)
         this.baseURL = window.location.protocol + '//' + window.location.hostname + ':8000';
-        // Usar sessionStorage para armazenar o token JWT
+        // Usar apenas sessionStorage para armazenar o token (perdido no reload)
         this.token = sessionStorage.getItem('access_token');
         this.isRedirecting = false; // Flag para evitar loops de redirecionamento
         
@@ -29,9 +29,7 @@ class ApiClient {
             headers: {
                 ...options.headers
             },
-            ...options,
-            // Enviar cookies (inclui HttpOnly cookies) nas requisições
-            credentials: 'include'
+            ...options
         };
 
         // Não definir Content-Type se for FormData (deixa o fetch definir automaticamente)
@@ -48,17 +46,12 @@ class ApiClient {
             config.body = JSON.stringify(config.body);
         }
 
-        // Adicionar automaticamente o header CSRF para métodos mutantes quando disponível
+        // Adicionar automaticamente o header CSRF quando disponível no sessionStorage
         try {
             const method = (config.method || 'GET').toUpperCase();
             const mutating = ['POST', 'PUT', 'DELETE', 'PATCH'];
-            if (mutating.includes(method) && !(config.headers && (config.headers['X-CSRF-Token'] || config.headers['x-csrf-token']))) {
-                // Ler cookie csrf_token (não HttpOnly)
-                const getCookie = (name) => {
-                    const match = document.cookie.match(new RegExp('(^|;)\s*' + name + '\s*=\s*([^;]+)'));
-                    return match ? decodeURIComponent(match.pop()) : null;
-                };
-                const csrf = getCookie('csrf_token');
+            if (mutating.includes(method)) {
+                const csrf = sessionStorage.getItem('csrf_token');
                 if (csrf) {
                     config.headers = config.headers || {};
                     config.headers['X-CSRF-Token'] = csrf;
@@ -132,17 +125,19 @@ class ApiClient {
             },
             body: JSON.stringify(details)
         });
-        
-        // Armazenar o token retornado
+
+        // Armazenar o token retornado no sessionStorage
         if (response.access_token) {
             sessionStorage.setItem('access_token', response.access_token);
             this.token = response.access_token;
-        }
-        
-        return response;
-    }
 
-    async logout() {
+            // Gerar e armazenar token CSRF no sessionStorage
+            const csrf_token = this.generateCSRFToken();
+            sessionStorage.setItem('csrf_token', csrf_token);
+        }
+
+        return response;
+    }    async logout() {
         // Para logout, pedir ao backend para limpar cookie e limpar dados locais
         try {
             await this.post('/api/auth/logout');
@@ -257,25 +252,68 @@ class ApiClient {
     }
 
     clearStoredAuth() {
-        // Limpar todos os dados de autenticação armazenados localmente
+        // Limpar todos os dados de autenticação armazenados no sessionStorage
         sessionStorage.removeItem('access_token');
         sessionStorage.removeItem('userRole');
         sessionStorage.removeItem('userName');
+        sessionStorage.removeItem('csrf_token');
         this.token = null;
         this.userRole = null;
         this.userName = null;
     }
 
-    async initValidation() {
-        // Aguardar um pouco para garantir que a página esteja carregada
-        setTimeout(async () => {
-            await this.validateStoredToken();
-        }, 100);
+    generateCSRFToken() {
+        // Gerar token CSRF aleatório
+        const array = new Uint8Array(32);
+        window.crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+
+    getCsrfToken() {
+        // Retornar token CSRF do sessionStorage
+        return sessionStorage.getItem('csrf_token');
     }
 }
 
 // Global API client instance
 const api = window.apiClient;
+
+// Sistema de detecção de reload - implementação robusta
+(function() {
+    try {
+        let isReload = false;
+
+        // Preferir Navigation Timing Level 2
+        if (performance.getEntriesByType) {
+            const navEntries = performance.getEntriesByType('navigation');
+            if (navEntries && navEntries.length > 0) {
+                isReload = navEntries[0].type === 'reload';
+            }
+        }
+
+        // Fallback para Navigation Timing Level 1
+        if (!isReload && performance.navigation) {
+            // Older APIs: TYPE_RELOAD or numeric value 1
+            isReload = (performance.navigation.type === performance.navigation.TYPE_RELOAD) || (performance.navigation.type === 1);
+        }
+
+        if (isReload) {
+            console.log('🔄 Detected page reload via Navigation Timing API - clearing sessionStorage and redirecting to /login');
+            // limpar todas as credenciais locais
+            sessionStorage.clear();
+            // garantir que o usuário vá para a tela de login
+            if (!window.location.pathname.includes('/login')) {
+                window.location.href = '/login';
+            }
+        } else {
+            // Não é reload: nada a fazer aqui. Permitir navegação normal.
+            console.debug('Página carregada por navegação normal (not reload)');
+        }
+    } catch (e) {
+        console.debug('Reload detection failed:', e);
+        // Em caso de falha, não forçar logout para evitar interromper a navegação normal
+    }
+})();
 
 // Utility functions
 const utils = {
