@@ -18,7 +18,7 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     from app.models.imovel import Imovel
     from app.models.aluguel import AluguelMensal
     from app.models.usuario import Usuario
-    from datetime import datetime
+    from datetime import datetime, timedelta
     
     # Contar imóveis (este número não depende de permissões financeiras)
     total_imoveis = db.query(Imovel).count()
@@ -31,29 +31,30 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     
     # Receita do mês atual (soma única dos valores totais por imóvel)
     hoje = datetime.now()
-    
+
     # Subquery para obter valor_total único por imóvel no mês
-    # Usar uma lógica mais robusta: pegar o valor mais recente ou o maior valor positivo
-    subquery_q = db.query(
+    subquery_mensal = db.query(
         AluguelMensal.id_imovel,
         func.max(AluguelMensal.valor_total).label('valor_total_unico')
     ).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year,
         extract('month', AluguelMensal.data_referencia) == hoje.month
-    )
+    ).group_by(AluguelMensal.id_imovel).subquery()
+
+    receita_mensal_q = db.query(func.sum(subquery_mensal.c.valor_total_unico))
 
     if permitted is not None:
         if not permitted:
-            receita_mensal = 0
+            receita_mensal = 0.0
         else:
-            subquery_q = subquery_q.filter(AluguelMensal.id_proprietario.in_(permitted))
-            subquery = subquery_q.group_by(AluguelMensal.id_imovel).subquery()
-            receita_mensal = db.query(func.sum(subquery.c.valor_total_unico)).scalar() or 0
+            # Filtrar imóveis pelos proprietários permitidos
+            receita_mensal_q = receita_mensal_q.join(
+                AluguelMensal,
+                AluguelMensal.id_imovel == subquery_mensal.c.id_imovel
+            ).filter(AluguelMensal.id_proprietario.in_(permitted))
+            receita_mensal = receita_mensal_q.scalar() or 0.0
     else:
-        subquery = subquery_q.group_by(AluguelMensal.id_imovel).subquery()
-        receita_mensal = db.query(func.sum(subquery.c.valor_total_unico)).scalar() or 0
-    
-    receita_mensal = db.query(func.sum(subquery.c.valor_total_unico)).scalar() or 0
+        receita_mensal = receita_mensal_q.scalar() or 0.0
     
     # Aluguéis ativos (todos os registros do mês atual)
     alugueis_ativos_q = db.query(func.count(func.distinct(AluguelMensal.id))).filter(
@@ -96,31 +97,53 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     
     taxa_ocupacao = (imoveis_ocupados / total_imoveis * 100) if total_imoveis > 0 else 0
     
-    # Receita do ano atual
-    receita_anual_q = db.query(func.sum(AluguelMensal.valor_total)).filter(
+    # Receita do ano atual (soma única dos valores totais por imóvel)
+    subquery_anual = db.query(
+        AluguelMensal.id_imovel,
+        func.max(AluguelMensal.valor_total).label('valor_total_unico')
+    ).filter(
         extract('year', AluguelMensal.data_referencia) == hoje.year
-    )
+    ).group_by(AluguelMensal.id_imovel).subquery()
+
+    receita_anual_q = db.query(func.sum(subquery_anual.c.valor_total_unico))
+
     if permitted is not None:
         if not permitted:
-            receita_anual = 0
+            receita_anual = 0.0
         else:
-            receita_anual = receita_anual_q.filter(AluguelMensal.id_proprietario.in_(permitted)).scalar() or 0
+            # Filtrar imóveis pelos proprietários permitidos
+            receita_anual_q = receita_anual_q.join(
+                AluguelMensal,
+                AluguelMensal.id_imovel == subquery_anual.c.id_imovel
+            ).filter(AluguelMensal.id_proprietario.in_(permitted))
+            receita_anual = receita_anual_q.scalar() or 0.0
     else:
-        receita_anual = receita_anual_q.scalar() or 0
+        receita_anual = receita_anual_q.scalar() or 0.0
     
-    # Receita do mês anterior
+    # Receita do mês anterior (soma única dos valores totais por imóvel)
     mes_anterior = hoje.replace(day=1) - timedelta(days=1)
-    receita_mes_anterior_q = db.query(func.sum(AluguelMensal.valor_total)).filter(
+    subquery_mes_anterior = db.query(
+        AluguelMensal.id_imovel,
+        func.max(AluguelMensal.valor_total).label('valor_total_unico')
+    ).filter(
         extract('year', AluguelMensal.data_referencia) == mes_anterior.year,
         extract('month', AluguelMensal.data_referencia) == mes_anterior.month
-    )
+    ).group_by(AluguelMensal.id_imovel).subquery()
+
+    receita_mes_anterior_q = db.query(func.sum(subquery_mes_anterior.c.valor_total_unico))
+
     if permitted is not None:
         if not permitted:
-            receita_mes_anterior = 0
+            receita_mes_anterior = 0.0
         else:
-            receita_mes_anterior = receita_mes_anterior_q.filter(AluguelMensal.id_proprietario.in_(permitted)).scalar() or 0
+            # Filtrar imóveis pelos proprietários permitidos
+            receita_mes_anterior_q = receita_mes_anterior_q.join(
+                AluguelMensal,
+                AluguelMensal.id_imovel == subquery_mes_anterior.c.id_imovel
+            ).filter(AluguelMensal.id_proprietario.in_(permitted))
+            receita_mes_anterior = receita_mes_anterior_q.scalar() or 0.0
     else:
-        receita_mes_anterior = receita_mes_anterior_q.scalar() or 0
+        receita_mes_anterior = receita_mes_anterior_q.scalar() or 0.0
     
     # Variação da receita
     if receita_mes_anterior > 0:
@@ -139,8 +162,7 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
         "imoveis_disponiveis": imoveis_disponiveis,
         "alugueis_ativos": alugueis_ativos,
         "proprietarios_ativos": proprietarios_ativos,
-        "taxa_ocupacao": round(taxa_ocupacao, 1),
-        "total_usuarios": total_usuarios
+        "taxa_ocupacao": round(taxa_ocupacao, 1)
     }
 
 @router.get("/charts")

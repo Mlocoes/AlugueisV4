@@ -107,10 +107,16 @@ class DashboardManager {
         try {
             const stats = await this.apiClient.get('/api/dashboard/stats');
 
-            document.getElementById('receita-mensal').textContent = `R$ ${stats.receita_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-            document.getElementById('receita-anual').textContent = `R$ ${stats.receita_anual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-            document.getElementById('variacao-mensal').textContent = `${stats.variacao_mensal > 0 ? '+' : ''}${stats.variacao_mensal}%`;
-            document.getElementById('imoveis-disponiveis').textContent = stats.imoveis_disponiveis;
+            // Verificar e formatar valores com segurança
+            const receitaMensal = stats.receita_mensal || 0;
+            const receitaAnual = stats.receita_anual || 0;
+            const variacaoMensal = stats.variacao_mensal || 0;
+            const imoveisDisponiveis = stats.imoveis_disponiveis || 0;
+
+            document.getElementById('receita-mensal').textContent = `R$ ${receitaMensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            document.getElementById('receita-anual').textContent = `R$ ${receitaAnual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            document.getElementById('variacao-mensal').textContent = `${variacaoMensal > 0 ? '+' : ''}${variacaoMensal}%`;
+            document.getElementById('imoveis-disponiveis').textContent = imoveisDisponiveis;
 
         } catch (error) {
             console.error('Erro ao carregar estatísticas:', error);
@@ -118,6 +124,7 @@ class DashboardManager {
             document.getElementById('receita-mensal').textContent = 'R$ 0,00';
             document.getElementById('receita-anual').textContent = 'R$ 0,00';
             document.getElementById('variacao-mensal').textContent = '0%';
+            document.getElementById('imoveis-disponiveis').textContent = '0';
             document.getElementById('imoveis-disponiveis').textContent = '0';
         }
     }
