@@ -22,6 +22,9 @@ Sistema completo para gestão de imóveis, aluguéis e proprietários com contro
 ```bash
 # Executar verificação automática
 ./security_check.sh
+
+# Ou diretamente
+scripts/security_check.sh
 ```
 
 **Nunca execute este sistema como root!** Use sempre usuários não-privilegiados.
@@ -117,14 +120,41 @@ AlugueisV4/
 │   ├── static/         # Arquivos estáticos
 │   ├── templates/      # Templates HTML
 │   └── main.py         # Aplicação principal
+├── scripts/            # Scripts de utilidade e manutenção
+├── test_scripts/       # Scripts de teste e configuração
+├── tests/              # Testes automatizados
 ├── alembic/            # Migrações de banco
+├── excel/              # Modelos Excel para importação
 ├── requirements.txt    # Dependências Python
 ├── Dockerfile          # Container da aplicação
 ├── docker-compose.yml  # Orquestração
 └── README.md           # Documentação
 ```
 
-## 🚀 Como Executar
+## �️ Scripts Disponíveis
+
+O projeto inclui vários scripts organizados em diretórios específicos:
+
+### Scripts de Utilidade (`scripts/`)
+- `scripts/start.sh` - Inicialização rápida do sistema
+- `scripts/monitor.sh` - Monitoramento automático de saúde
+- `scripts/install-service.sh` - Instalação do serviço SystemD
+- `scripts/security_check.sh` - Verificação de segurança
+- `scripts/migrate.sh` - Migração para PostgreSQL
+- `scripts/create_admin_user.py` - Criar usuário administrador
+- `scripts/create_admin_postgres.py` - Configurar admin no PostgreSQL
+- `scripts/dashboard_verification.py` - Verificar dashboard
+- `scripts/test_final.py` - Testes finais do sistema
+
+### Scripts de Teste (`test_scripts/`)
+- `test_scripts/create_test_users.py` - Criar usuários de teste
+- `test_scripts/setup_test_user.py` - Configurar usuário de teste
+- `test_scripts/clear_all_rentals.py` - Limpar aluguéis de teste
+- `test_scripts/clear_incorrect_data.py` - Limpar dados incorretos
+
+> 💡 **Compatibilidade**: Scripts podem ser executados da raiz do projeto (shims automáticos) ou diretamente dos diretórios `scripts/` e `test_scripts/`.
+
+## �🚀 Como Executar
 
 ### Desenvolvimento Local (Recomendado)
 
@@ -175,6 +205,9 @@ O sistema agora conta com **reinicialização automática** para garantir alta d
 ```bash
 # Script automático (recomendado)
 ./start.sh
+
+# Ou diretamente do diretório scripts/
+scripts/start.sh
 ```
 
 ### 📊 Monitoramento Automático
@@ -183,6 +216,9 @@ O sistema agora conta com **reinicialização automática** para garantir alta d
 ```bash
 # Instalar serviço de monitoramento
 sudo ./install-service.sh
+
+# Ou diretamente
+sudo scripts/install-service.sh
 
 # Verificar status
 sudo systemctl status alugueis-monitor.service
@@ -194,13 +230,16 @@ sudo journalctl -u alugueis-monitor.service -f
 #### Opção 2: Cron Job
 ```bash
 # Adicionar ao crontab (verificar a cada 5 minutos)
-*/5 * * * * /home/mloco/Escritorio/AlugueisV4/monitor.sh
+*/5 * * * * /home/mloco/Escritorio/AlugueisV4/scripts/monitor.sh
 ```
 
 #### Opção 3: Manual
 ```bash
 # Verificar status manualmente
 ./monitor.sh
+
+# Ou diretamente
+scripts/monitor.sh
 
 # Ver logs
 tail -f monitor.log
@@ -430,11 +469,17 @@ Notas:
 
 ### Testes Manuais Disponíveis
 ```bash
-# Testar CRUD de imóveis
-python3 test_crud.py
+# Scripts organizados em test_scripts/
+test_scripts/create_test_users.py
+test_scripts/setup_test_user.py
+test_scripts/clear_all_rentals.py
+test_scripts/clear_incorrect_data.py
 
-# Testar CRUD de proprietários  
-python3 test_proprietarios.py
+# Ou da raiz (shims)
+./create_test_users.py
+./setup_test_user.py
+./clear_all_rentals.py
+./clear_incorrect_data.py
 ```
 
 ### Teste Interativo (API Docs)
