@@ -136,7 +136,8 @@ AlugueisV4/
 O projeto inclui vários scripts organizados em diretórios específicos:
 
 ### Scripts de Utilidade (`scripts/`)
-- `scripts/install_complete.sh` - **Instalação completa** (BD + admin)
+- `scripts/install_complete.sh` - **Instalação completa** (desenvolvimento com SQLite)
+- `scripts/install_production.sh` - **Instalação de produção** (Docker + PostgreSQL)
 - `scripts/start.sh` - Inicialização rápida do sistema
 - `scripts/monitor.sh` - Monitoramento automático de saúde
 - `scripts/install-service.sh` - Instalação do serviço SystemD
@@ -157,24 +158,29 @@ O projeto inclui vários scripts organizados em diretórios específicos:
 
 ##  Como Executar
 
-### Instalação Completa (Recomendado para Primeira Vez)
+### Instalação de Produção (Docker + PostgreSQL)
 
-Para configurar tudo automaticamente (base de dados + primeiro admin):
+Para configurar em ambiente de produção com Docker:
 
 ```bash
-# Instalação completa interativa
-./install_complete.sh
+# Instalação completa de produção
+./install_production.sh
 
 # Ou diretamente
-scripts/install_complete.sh
+scripts/install_production.sh
 ```
 
 O script irá:
-- ✅ Criar ambiente virtual e instalar dependências
-- ✅ Perguntar se deseja criar BD do zero
-- ✅ Executar migrações do banco
-- ✅ Pedir dados do primeiro usuário administrador
-- ✅ Criar o usuário admin automaticamente
+- ✅ Verificar Docker e Docker Compose
+- ✅ Configurar arquivo .env para produção
+- ✅ Construir e iniciar containers
+- ✅ Executar migrações no PostgreSQL
+- ✅ Criar primeiro usuário administrador
+
+**Pré-requisitos:**
+- Docker e Docker Compose instalados
+- Porta 5432 (PostgreSQL) e 8000 (app) disponíveis
+- Configure o .env com credenciais de produção
 
 ### Desenvolvimento Local (Manual)
 
