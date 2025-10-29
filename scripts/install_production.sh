@@ -25,13 +25,18 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
-# Verificar se Docker Compose está instalado
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    echo "❌ Erro: Docker Compose não encontrado. Instale o Docker Compose primeiro."
+# Detectar comando do Docker Compose: preferir 'docker-compose' se existir, senão usar 'docker compose'
+DOCKER_COMPOSE_CMD=""
+if command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+elif docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+else
+    echo "❌ Erro: Docker Compose não encontrado (nem 'docker-compose' nem 'docker compose'). Instale o Compose ou use o shim sugerido." 
     exit 1
 fi
 
-echo "🐳 Docker e Docker Compose detectados"
+echo "🐳 Docker detectado e usando comando de compose: $DOCKER_COMPOSE_CMD"
 
 # Verificar se .env existe
 if [ ! -f ".env" ]; then
@@ -53,7 +58,7 @@ echo "-------------------------------------"
 
 # Parar containers existentes
 echo "  🛑 Parando containers existentes..."
-docker-compose down || true
+$DOCKER_COMPOSE_CMD down || true
 
 # Limpar imagens não utilizadas (opcional)
 read -p "Deseja limpar imagens Docker não utilizadas? (y/n): " -n 1 -r
@@ -69,21 +74,21 @@ echo "-------------------------------------"
 
 # Construir e iniciar serviços
 echo "  📦 Construindo imagens..."
-docker-compose build --no-cache
+$DOCKER_COMPOSE_CMD build --no-cache
 
 echo "  🚀 Iniciando serviços..."
-docker-compose up -d
+$DOCKER_COMPOSE_CMD up -d
 
 echo "  ⏳ Aguardando serviços ficarem prontos..."
 sleep 30
 
 # Verificar se os serviços estão rodando
 echo "  🔍 Verificando status dos serviços..."
-if docker-compose ps | grep -q "Up"; then
+if $DOCKER_COMPOSE_CMD ps | grep -q "Up"; then
     echo "  ✅ Serviços iniciados com sucesso!"
 else
     echo "  ❌ Erro ao iniciar serviços. Verifique os logs:"
-    docker-compose logs
+    $DOCKER_COMPOSE_CMD logs
     exit 1
 fi
 
@@ -93,11 +98,11 @@ echo "-------------------------------"
 
 # Executar migrações dentro do container
 echo "  📋 Executando migrações do banco..."
-if docker-compose exec -T app alembic upgrade head; then
+if $DOCKER_COMPOSE_CMD exec -T app alembic upgrade head; then
     echo "  ✅ Migrações executadas com sucesso!"
 else
     echo "  ❌ Erro nas migrações. Verifique os logs do banco:"
-    docker-compose logs db
+    $DOCKER_COMPOSE_CMD logs db
     exit 1
 fi
 
@@ -131,7 +136,7 @@ fi
 echo "  👤 Criando usuário administrador..."
 
 # Executar script dentro do container
-if docker-compose exec -T app python3 scripts/create_admin_interactive.py --nome "$ADMIN_NOME" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD"; then
+if $DOCKER_COMPOSE_CMD exec -T app python3 scripts/create_admin_interactive.py --nome "$ADMIN_NOME" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD"; then
     echo ""
     echo "🎉 INSTALAÇÃO DE PRODUÇÃO CONCLUÍDA!"
     echo "===================================="

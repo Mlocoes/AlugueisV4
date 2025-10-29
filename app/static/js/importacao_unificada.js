@@ -36,8 +36,11 @@ function setupDragAndDrop() {
         }
     });
 
-    // Evento de clique na zona
-    dropZone.addEventListener('click', function() {
+    // Evento de clique na zona: abrir somente se o clique for diretamente na zona (não em filhos)
+    dropZone.addEventListener('click', function(e) {
+        if (e.target !== dropZone) return; // evitar abrir ao clicar em botões/filhos
+        // Resetar valor para garantir que selecionar o mesmo arquivo novamente dispare o evento 'change'
+        try { fileInput.value = ''; } catch (e) {}
         fileInput.click();
     });
 }
@@ -75,6 +78,15 @@ function handleFileSelection(file) {
     selectedFile = file;
     updateFileDisplay();
     hideAnalysisResult();
+    // Limpar o valor do input para permitir re-seleção do mesmo arquivo sem precisar fechar/abrir
+    try { document.getElementById('file-input').value = ''; } catch (e) {}
+}
+
+// Abrir diálogo de arquivo de forma segura (limpa valor antes)
+function openFileDialog() {
+    const fileInput = document.getElementById('file-input');
+    try { fileInput.value = ''; } catch (e) {}
+    fileInput.click();
 }
 
 // Atualizar exibição do arquivo selecionado
@@ -110,12 +122,13 @@ function clearFile() {
 
 // Esconder resultado da análise
 function hideAnalysisResult() {
-    const analysisResult = document.getElementById('analysis-result');
+    // esconder elementos de UI e resetar o resultado da análise (variável global)
+    const analysisDiv = document.getElementById('analysis-result');
     const actionButtons = document.getElementById('action-buttons');
 
-    analysisResult.classList.add('hidden');
-    actionButtons.classList.add('hidden');
-    analysisResult = null;
+    if (analysisDiv) analysisDiv.classList.add('hidden');
+    if (actionButtons) actionButtons.classList.add('hidden');
+    analysisResult = null; // reset global
 }
 
 // Analisar arquivo automaticamente
@@ -131,20 +144,55 @@ async function analyzeFile() {
         const formData = new FormData();
         formData.append('file', selectedFile);
 
-        const response = await fetch('/upload', {
+        // Preparar headers opcionalmente (enviar Authorization sólo si hay token)
+        const token = getAuthToken();
+        const fetchOptions = {
             method: 'POST',
             body: formData,
-            headers: {
-                'Authorization': `Bearer ${getAuthToken()}`
-            }
-        });
-
-        if (!response.ok) {
-            const errorData = await response.json();
-            throw new Error(errorData.detail || 'Erro na análise do arquivo');
+            credentials: 'same-origin'
+        };
+        if (token) {
+            fetchOptions.headers = { 'Authorization': `Bearer ${token}` };
         }
 
-        const result = await response.json();
+    const response = await fetch('/api/importacao/upload', fetchOptions);
+
+        if (!response.ok) {
+            // tentar parsear JSON, se não possível tomar o texto cru
+            let errorText = null;
+            try {
+                const errJson = await response.json();
+                errorText = errJson.detail || errJson.message || JSON.stringify(errJson);
+            } catch (e) {
+                try {
+                    errorText = await response.text();
+                } catch (e2) {
+                    errorText = response.statusText || 'Erro desconhecido';
+                }
+            }
+            throw new Error(errorText || 'Erro na análise do arquivo');
+        }
+
+        let raw = null;
+        try {
+            raw = await response.json();
+        } catch (e) {
+            // resposta não é JSON — ler texto para diagnóstico
+            const txt = await response.text();
+            throw new Error(txt || 'Resposta inválida do servidor');
+        }
+
+        // Normalizar resposta do backend para a forma esperada pelo UI
+        const result = {
+            success: raw.success === true,
+            tipo: raw.tipo || raw.tipo_detectado || (raw.analise && raw.analise.tipo_detectado) || null,
+            total_registros: raw.total_registros || (raw.analise && raw.analise.total_linhas) || raw.analise && raw.analise.total_linhas || 0,
+            preview: raw.preview || (raw.analise && raw.analise.preview) || (raw.analise && raw.analise.amostra) || [],
+            warnings: raw.warnings || raw.problemas || (raw.analise && raw.analise.problemas) || [],
+            message: raw.message || raw.msg || null,
+            raw: raw,
+        };
+
         analysisResult = result;
 
         displayAnalysisResult(result);
@@ -281,13 +329,18 @@ async function proceedWithImport() {
         formData.append('file', selectedFile);
         formData.append('tipo', analysisResult.tipo);
 
-        const response = await fetch('/importar', {
+        // Preparar headers opcionalmente y enviar cookies (se same-origin)
+        const token2 = getAuthToken();
+        const fetchOptions2 = {
             method: 'POST',
             body: formData,
-            headers: {
-                'Authorization': `Bearer ${getAuthToken()}`
-            }
-        });
+            credentials: 'same-origin'
+        };
+        if (token2) {
+            fetchOptions2.headers = { 'Authorization': `Bearer ${token2}` };
+        }
+
+    const response = await fetch('/api/importacao/importar', fetchOptions2);
 
         if (!response.ok) {
             const errorData = await response.json();

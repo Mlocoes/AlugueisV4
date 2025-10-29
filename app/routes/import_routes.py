@@ -3,11 +3,14 @@ Rotas para importação de dados via Excel - Versão Unificada
 Sistema inteligente que detecta automaticamente o tipo de dados
 """
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.orm import Session
 from typing import Dict, Any
 from app.core.database import get_db
 from app.services.import_service import ImportacaoAvancadaService
 from app.core.auth import get_current_active_user
+import math
+import numpy as np
 from app.schemas import Usuario
 import pandas as pd
 from io import BytesIO
@@ -158,6 +161,28 @@ async def analisar_arquivo_tipo(
     try:
         content = await file.read()
         df = pd.read_excel(BytesIO(content), sheet_name=0)
+
+        # Sanitizar DataFrame para evitar valores no serializables por JSON
+        try:
+            df = df.replace([float('inf'), float('-inf')], None)
+            df = df.where(pd.notna(df), None)
+            df = df.astype(object).where(pd.notna(df), None)
+        except Exception:
+            # No bloquear la ruta si la sanitización falla; será manejado abajo
+            pass
+
+        # Sanitizar DataFrame para evitar valores no serializables por JSON
+        # - Remover infinitos
+        # - Convertir NaN a None
+        # - Asegurar tipos Python nativos para serialización
+        try:
+            df = df.replace([float('inf'), float('-inf')], None)
+            df = df.where(pd.notna(df), None)
+            df = df.astype(object).where(pd.notna(df), None)
+        except Exception:
+            # En caso de error en la conversión, continuar y dejar que la validación de preview
+            # maneje posibles problemas más adelante (no queremos romper la ruta completa)
+            pass
         
         # Limpar dados para evitar problemas de serialização JSON
         df = df.replace([float('inf'), float('-inf')], None)  # Remover infinitos
@@ -424,7 +449,36 @@ async def upload_arquivo_unificado(
         tipo_detectado = detectar_tipo_arquivo(file.filename, df)
         
         if tipo_detectado == 'desconhecido':
-            return {
+            # Sanitizar preview para evitar valores não serializáveis
+            preview_rows = df.head(3).to_dict('records')
+            def _sanitize_simple(v):
+                try:
+                    if pd.isna(v):
+                        return None
+                except Exception:
+                    pass
+                try:
+                    if isinstance(v, np.generic):
+                        return v.item()
+                except Exception:
+                    pass
+                try:
+                    if isinstance(v, pd.Timestamp):
+                        return v.isoformat()
+                except Exception:
+                    pass
+                try:
+                    if isinstance(v, float) and not math.isfinite(v):
+                        return None
+                except Exception:
+                    pass
+                return v
+
+            safe_preview = []
+            for row in preview_rows:
+                safe_preview.append({k: _sanitize_simple(v) for k, v in row.items()})
+
+            return jsonable_encoder({
                 'success': False,
                 'tipo_detectado': 'desconhecido',
                 'message': 'Não foi possível detectar o tipo de dados automaticamente',
@@ -433,17 +487,66 @@ async def upload_arquivo_unificado(
                     'Verifique se as colunas estão corretas para o tipo de dados',
                     'Use a análise manual especificando o tipo'
                 ],
-                'colunas_encontradas': list(df.columns),
-                'preview': df.head(3).to_dict('records')
-            }
+                'colunas_encontradas': [str(c) for c in df.columns],
+                'preview': safe_preview
+            })
         
+        # Função utilitária para sanitizar valores antes de serializar
+        def _sanitize_value(v):
+            try:
+                if v is None:
+                    return None
+                # pandas NaT or NaN
+                if pd.isna(v):
+                    return None
+            except Exception:
+                pass
+
+            # numpy scalar
+            if isinstance(v, (np.generic,)):
+                try:
+                    v = v.item()
+                except Exception:
+                    pass
+
+            # floats: evitar inf/NaN y valores fuera de rango
+            if isinstance(v, float):
+                if not math.isfinite(v):
+                    return None
+                # limitar representation if too large
+                if abs(v) > 1e308:
+                    return str(v)
+
+            # datetimes -> iso
+            try:
+                if isinstance(v, pd.Timestamp):
+                    return v.isoformat()
+            except Exception:
+                pass
+
+            # Decimals, numpy types, others: stringify if not JSON serializable
+            try:
+                import decimal
+                if isinstance(v, decimal.Decimal):
+                    return float(v)
+            except Exception:
+                pass
+
+            return v
+
         # Análise básica
+        preview_rows = df.head(5).to_dict('records')
+        safe_preview = []
+        for row in preview_rows:
+            safe_row = {k: _sanitize_value(v) for k, v in row.items()}
+            safe_preview.append(safe_row)
+
         analise = {
             'total_linhas': len(df),
             'total_colunas': len(df.columns),
-            'colunas_encontradas': list(df.columns),
+            'colunas_encontradas': [str(c) for c in df.columns],
             'tipo_detectado': tipo_detectado,
-            'preview': df.head(5).to_dict('records'),
+            'preview': safe_preview,
             'problemas': []
         }
         
@@ -473,13 +576,13 @@ async def upload_arquivo_unificado(
         elif tipo_detectado == 'alugueis':
             analise['problemas'].append("Aluguéis requerem formato especial com múltiplas planilhas")
         
-        return {
+        return jsonable_encoder({
             'success': True,
             'tipo_detectado': tipo_detectado,
             'analise': analise,
             'message': f'Arquivo analisado com sucesso. Tipo detectado: {tipo_detectado}',
             'ready_for_import': len(analise['problemas']) == 0
-        }
+        })
         
     except Exception as e:
         raise HTTPException(
