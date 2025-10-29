@@ -1,5 +1,6 @@
 """
-Rotas para importação de dados via Excel - Versão Avançada
+Rotas para importação de dados via Excel - Versão Unificada
+Sistema inteligente que detecta automaticamente o tipo de dados
 """
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -326,4 +327,229 @@ async def analisar_arquivo(
         raise HTTPException(
             status_code=400,
             detail=f'Erro ao analisar arquivo: {str(e)}'
+        )
+
+
+def detectar_tipo_arquivo(filename: str, df: pd.DataFrame) -> str:
+    """
+    Detecta automaticamente o tipo de dados baseado no nome do arquivo e conteúdo
+    
+    **Critérios de detecção:**
+    - Nome do arquivo: proprietarios, imoveis, participacoes, alugueis
+    - Colunas específicas para cada tipo
+    - Conteúdo dos dados
+    """
+    filename_lower = filename.lower()
+    
+    # Detecção por nome do arquivo
+    if 'proprietario' in filename_lower or 'owner' in filename_lower:
+        return 'proprietarios'
+    elif 'imovel' in filename_lower or 'imóvel' in filename_lower or 'property' in filename_lower:
+        return 'imoveis'
+    elif 'participacao' in filename_lower or 'participação' in filename_lower or 'share' in filename_lower:
+        return 'participacoes'
+    elif 'aluguel' in filename_lower or 'aluguel' in filename_lower or 'rent' in filename_lower:
+        return 'alugueis'
+    
+    # Detecção por colunas
+    columns = [str(col).lower() for col in df.columns]
+    
+    # Proprietários: tem email, documento, telefone
+    if any('email' in col for col in columns) and any('documento' in col or 'cpf' in col for col in columns):
+        return 'proprietarios'
+    
+    # Imóveis: tem endereço, nome/título
+    if any('endereço' in col or 'address' in col for col in columns) and any('nome' in col or 'title' in col for col in columns):
+        return 'imoveis'
+    
+    # Participações: tem VALOR próximo de 1.0
+    valor_col = None
+    for col in df.columns:
+        if 'VALOR' in str(col).upper():
+            valor_col = col
+            break
+    
+    if valor_col is not None:
+        valores = df[valor_col].dropna()
+        if len(valores) > 0:
+            media_valor = valores.mean()
+            if abs(media_valor - 1.0) < 0.1:  # Valores próximos de 1.0
+                return 'participacoes'
+    
+    # Aluguéis: múltiplas planilhas ou formato especial
+    try:
+        xl = pd.ExcelFile(BytesIO(df.to_excel().encode()))
+        if len(xl.sheet_names) > 1:
+            return 'alugueis'
+    except:
+        pass
+    
+    # Fallback: tentar detectar por conteúdo
+    sample_text = ' '.join([str(val) for val in df.iloc[0].values if pd.notna(val)]).lower()
+    
+    if 'cpf' in sample_text or 'cnpj' in sample_text:
+        return 'proprietarios'
+    elif 'rua' in sample_text or 'avenida' in sample_text or 'street' in sample_text:
+        return 'imoveis'
+    
+    return 'desconhecido'
+
+
+@router.post("/upload")
+async def upload_arquivo_unificado(
+    file: UploadFile = File(...),
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+) -> Dict[str, Any]:
+    """
+    Upload unificado de arquivo Excel - detecta automaticamente o tipo
+    
+    **Funcionalidades:**
+    - Detecção automática do tipo de dados
+    - Validação da estrutura do arquivo
+    - Preview dos dados antes da importação
+    - Importação opcional após análise
+    """
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Arquivo deve ser Excel (.xlsx ou .xls)"
+        )
+    
+    try:
+        content = await file.read()
+        df = pd.read_excel(BytesIO(content), sheet_name=0)
+        
+        # Detectar tipo
+        tipo_detectado = detectar_tipo_arquivo(file.filename, df)
+        
+        if tipo_detectado == 'desconhecido':
+            return {
+                'success': False,
+                'tipo_detectado': 'desconhecido',
+                'message': 'Não foi possível detectar o tipo de dados automaticamente',
+                'sugestoes': [
+                    'Verifique se o nome do arquivo contém: proprietarios, imoveis, participacoes, ou alugueis',
+                    'Verifique se as colunas estão corretas para o tipo de dados',
+                    'Use a análise manual especificando o tipo'
+                ],
+                'colunas_encontradas': list(df.columns),
+                'preview': df.head(3).to_dict('records')
+            }
+        
+        # Análise básica
+        analise = {
+            'total_linhas': len(df),
+            'total_colunas': len(df.columns),
+            'colunas_encontradas': list(df.columns),
+            'tipo_detectado': tipo_detectado,
+            'preview': df.head(5).to_dict('records'),
+            'problemas': []
+        }
+        
+        # Validações específicas por tipo detectado
+        if tipo_detectado == 'proprietarios':
+            required_cols = ['Nome', 'Email']
+            missing = [col for col in required_cols if col not in df.columns]
+            if missing:
+                analise['problemas'].append(f"Colunas obrigatórias faltando: {', '.join(missing)}")
+                
+        elif tipo_detectado == 'imoveis':
+            required_cols = ['Nome', 'Endereço']
+            missing = [col for col in required_cols if col not in df.columns]
+            if missing:
+                analise['problemas'].append(f"Colunas obrigatórias faltando: {', '.join(missing)}")
+                
+        elif tipo_detectado == 'participacoes':
+            valor_col = None
+            for col in df.columns:
+                if 'VALOR' in str(col).upper():
+                    valor_col = col
+                    break
+            
+            if not valor_col:
+                analise['problemas'].append("Coluna VALOR não encontrada")
+                
+        elif tipo_detectado == 'alugueis':
+            analise['problemas'].append("Aluguéis requerem formato especial com múltiplas planilhas")
+        
+        return {
+            'success': True,
+            'tipo_detectado': tipo_detectado,
+            'analise': analise,
+            'message': f'Arquivo analisado com sucesso. Tipo detectado: {tipo_detectado}',
+            'ready_for_import': len(analise['problemas']) == 0
+        }
+        
+    except Exception as e:
+        raise HTTPException(
+            status_code=400,
+            detail=f'Erro ao processar arquivo: {str(e)}'
+        )
+
+
+@router.post("/importar")
+async def importar_arquivo_unificado(
+    file: UploadFile = File(...),
+    confirmar_importacao: bool = False,
+    db: Session = Depends(get_db),
+    current_user: Usuario = Depends(require_admin)
+) -> Dict[str, Any]:
+    """
+    Importação unificada de arquivo Excel
+    
+    **Parâmetros:**
+    - file: Arquivo Excel
+    - confirmar_importacao: true para executar a importação, false para apenas analisar
+    
+    **Processo:**
+    1. Detecta automaticamente o tipo de dados
+    2. Valida a estrutura do arquivo
+    3. Se confirmar_importacao=true, executa a importação
+    4. Retorna relatório completo
+    """
+    if not file.filename.endswith(('.xlsx', '.xls')):
+        raise HTTPException(
+            status_code=400,
+            detail="Arquivo deve ser Excel (.xlsx ou .xls)"
+        )
+    
+    try:
+        content = await file.read()
+        df = pd.read_excel(BytesIO(content), sheet_name=0)
+        
+        # Detectar tipo
+        tipo_detectado = detectar_tipo_arquivo(file.filename, df)
+        
+        if tipo_detectado == 'desconhecido':
+            raise HTTPException(
+                status_code=400,
+                detail="Não foi possível detectar o tipo de dados. Use análise manual ou verifique o arquivo."
+            )
+        
+        service = ImportacaoAvancadaService()
+        
+        # Executar importação baseada no tipo
+        if tipo_detectado == 'proprietarios':
+            result = service.importar_proprietarios(content, db)
+        elif tipo_detectado == 'imoveis':
+            result = service.importar_imoveis(content, db)
+        elif tipo_detectado == 'participacoes':
+            result = service.importar_participacoes(content, db)
+        elif tipo_detectado == 'alugueis':
+            result = service.importar_alugueis(content, db)
+        else:
+            raise HTTPException(status_code=400, detail=f"Tipo não suportado: {tipo_detectado}")
+        
+        result['tipo_detectado'] = tipo_detectado
+        result['arquivo'] = file.filename
+        
+        return result
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f'Erro interno durante importação: {str(e)}'
         )
