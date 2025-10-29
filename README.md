@@ -136,6 +136,7 @@ AlugueisV4/
 O projeto inclui vários scripts organizados em diretórios específicos:
 
 ### Scripts de Utilidade (`scripts/`)
+- `scripts/install_complete.sh` - **Instalação completa** (BD + admin)
 - `scripts/start.sh` - Inicialização rápida do sistema
 - `scripts/monitor.sh` - Monitoramento automático de saúde
 - `scripts/install-service.sh` - Instalação do serviço SystemD
@@ -154,9 +155,28 @@ O projeto inclui vários scripts organizados em diretórios específicos:
 
 > 💡 **Compatibilidade**: Scripts podem ser executados da raiz do projeto (shims automáticos) ou diretamente dos diretórios `scripts/` e `test_scripts/`.
 
-## �🚀 Como Executar
+##  Como Executar
 
-### Desenvolvimento Local (Recomendado)
+### Instalação Completa (Recomendado para Primeira Vez)
+
+Para configurar tudo automaticamente (base de dados + primeiro admin):
+
+```bash
+# Instalação completa interativa
+./install_complete.sh
+
+# Ou diretamente
+scripts/install_complete.sh
+```
+
+O script irá:
+- ✅ Criar ambiente virtual e instalar dependências
+- ✅ Perguntar se deseja criar BD do zero
+- ✅ Executar migrações do banco
+- ✅ Pedir dados do primeiro usuário administrador
+- ✅ Criar o usuário admin automaticamente
+
+### Desenvolvimento Local (Manual)
 
 1. **Clone o repositório**:
    ```bash
