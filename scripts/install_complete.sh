@@ -52,7 +52,12 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "  🗑️  Removendo base de dados existente..."
     rm -f test.db
 
-echo "  📋 Executando migrações..."
+    echo "  📋 Executando migrações..."
+    if [ -f ".env" ]; then
+        export $(grep -v '^#' .env | xargs)
+    fi
+    # Forçar SQLite para desenvolvimento local
+    export DATABASE_URL="sqlite:///test.db"
     export PYTHONPATH="$PWD"
     alembic upgrade head
 
@@ -61,6 +66,11 @@ else
     echo "  ⏭️  Pulando criação da base de dados."
     if [ ! -f "test.db" ]; then
         echo "  ⚠️  Base de dados não existe. Executando migrações..."
+        if [ -f ".env" ]; then
+            export $(grep -v '^#' .env | xargs)
+        fi
+        export DATABASE_URL="sqlite:///test.db"
+        export PYTHONPATH="$PWD"
         alembic upgrade head
     fi
 fi
@@ -95,6 +105,10 @@ fi
 echo "  👤 Criando usuário administrador..."
 
 # Executar script Python para criar o usuário
+if [ -f ".env" ]; then
+    export $(grep -v '^#' .env | xargs)
+fi
+export DATABASE_URL="sqlite:///test.db"
 export PYTHONPATH="$PWD"
 if python3 scripts/create_admin_interactive.py --nome "$ADMIN_NOME" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD"; then
     echo ""
