@@ -96,12 +96,47 @@ def get_dashboard_stats(db: Session = Depends(get_db), current_user: Usuario = D
     
     taxa_ocupacao = (imoveis_ocupados / total_imoveis * 100) if total_imoveis > 0 else 0
     
-    # Total de usuários
-    total_usuarios = db.query(Usuario).count()
+    # Receita do ano atual
+    receita_anual_q = db.query(func.sum(AluguelMensal.valor_total)).filter(
+        extract('year', AluguelMensal.data_referencia) == hoje.year
+    )
+    if permitted is not None:
+        if not permitted:
+            receita_anual = 0
+        else:
+            receita_anual = receita_anual_q.filter(AluguelMensal.id_proprietario.in_(permitted)).scalar() or 0
+    else:
+        receita_anual = receita_anual_q.scalar() or 0
+    
+    # Receita do mês anterior
+    mes_anterior = hoje.replace(day=1) - timedelta(days=1)
+    receita_mes_anterior_q = db.query(func.sum(AluguelMensal.valor_total)).filter(
+        extract('year', AluguelMensal.data_referencia) == mes_anterior.year,
+        extract('month', AluguelMensal.data_referencia) == mes_anterior.month
+    )
+    if permitted is not None:
+        if not permitted:
+            receita_mes_anterior = 0
+        else:
+            receita_mes_anterior = receita_mes_anterior_q.filter(AluguelMensal.id_proprietario.in_(permitted)).scalar() or 0
+    else:
+        receita_mes_anterior = receita_mes_anterior_q.scalar() or 0
+    
+    # Variação da receita
+    if receita_mes_anterior > 0:
+        variacao = ((receita_mensal - receita_mes_anterior) / receita_mes_anterior) * 100
+    else:
+        variacao = 0 if receita_mensal == 0 else 100
+    
+    # Imóveis disponíveis (total - ocupados)
+    imoveis_disponiveis = total_imoveis - imoveis_ocupados
     
     return {
         "total_imoveis": total_imoveis,
         "receita_mensal": float(receita_mensal),
+        "receita_anual": float(receita_anual),
+        "variacao_mensal": round(variacao, 1),
+        "imoveis_disponiveis": imoveis_disponiveis,
         "alugueis_ativos": alugueis_ativos,
         "proprietarios_ativos": proprietarios_ativos,
         "taxa_ocupacao": round(taxa_ocupacao, 1),

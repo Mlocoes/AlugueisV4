@@ -77,8 +77,6 @@ class DashboardManager {
             setTimeout(() => {
                 if (this.receitaChart) this.receitaChart.resize();
                 if (this.statusImoveisChart) this.statusImoveisChart.resize();
-                if (this.tiposImoveisChart) this.tiposImoveisChart.resize();
-                if (this.receitaProprietariosChart) this.receitaProprietariosChart.resize();
             }, 100);
         });
     }
@@ -100,9 +98,6 @@ class DashboardManager {
             // Carregar gráficos
             await this.loadCharts();
 
-            // Carregar tabela de aluguéis recentes
-            await this.loadRecentRentals();
-
         } catch (error) {
             console.error('Erro ao carregar dados do dashboard:', error);
         }
@@ -112,18 +107,18 @@ class DashboardManager {
         try {
             const stats = await this.apiClient.get('/api/dashboard/stats');
 
-            document.getElementById('total-imoveis').textContent = stats.total_imoveis;
             document.getElementById('receita-mensal').textContent = `R$ ${stats.receita_mensal.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-            document.getElementById('alugueis-ativos').textContent = stats.alugueis_ativos;
-            document.getElementById('alugueis-vencidos').textContent = '0'; // TODO: implementar contagem de aluguéis vencidos
+            document.getElementById('receita-anual').textContent = `R$ ${stats.receita_anual.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
+            document.getElementById('variacao-mensal').textContent = `${stats.variacao_mensal > 0 ? '+' : ''}${stats.variacao_mensal}%`;
+            document.getElementById('imoveis-disponiveis').textContent = stats.imoveis_disponiveis;
 
         } catch (error) {
             console.error('Erro ao carregar estatísticas:', error);
             // Mostrar valores padrão em caso de erro
-            document.getElementById('total-imoveis').textContent = '0';
             document.getElementById('receita-mensal').textContent = 'R$ 0,00';
-            document.getElementById('alugueis-ativos').textContent = '0';
-            document.getElementById('alugueis-vencidos').textContent = '0';
+            document.getElementById('receita-anual').textContent = 'R$ 0,00';
+            document.getElementById('variacao-mensal').textContent = '0%';
+            document.getElementById('imoveis-disponiveis').textContent = '0';
         }
     }
 
@@ -136,20 +131,12 @@ class DashboardManager {
             
             // Renderizar gráfico de status dos imóveis
             this.renderStatusImoveisChart(chartData.status_imoveis);
-            
-            // Renderizar gráfico de distribuição por tipo
-            this.renderTiposImoveisChart(chartData.distribuicao_tipos);
-            
-            // Renderizar gráfico de receita por proprietário
-            this.renderReceitaProprietariosChart(chartData.receita_por_proprietario);
 
         } catch (error) {
             console.error('Erro ao carregar gráficos:', error);
             // Renderizar gráficos vazios em caso de erro
             this.renderReceitaChart([]);
             this.renderStatusImoveisChart([]);
-            this.renderTiposImoveisChart([]);
-            this.renderReceitaProprietariosChart([]);
         }
     }
 
@@ -386,260 +373,6 @@ class DashboardManager {
         });
     }
 
-    renderTiposImoveisChart(data) {
-        // Verificar se Chart.js está disponível
-        if (typeof Chart === 'undefined') {
-            console.error('Chart.js não está carregado');
-            return;
-        }
-
-        const ctx = document.getElementById('tipos-imoveis-chart').getContext('2d');
-
-        // Destruir gráfico anterior se existir
-        if (this.tiposImoveisChart) {
-            console.log('Destruindo gráfico de tipos anterior');
-            this.tiposImoveisChart.destroy();
-        }
-
-        // Verificar se o canvas está visível e tem dimensões
-        const canvas = document.getElementById('tipos-imoveis-chart');
-        if (!canvas || canvas.offsetHeight === 0) {
-            console.warn('Canvas de tipos não está pronto, tentando novamente em 100ms');
-            setTimeout(() => this.renderTiposImoveisChart(data), 100);
-            return;
-        }
-
-        console.log('Renderizando gráfico de tipos com dados:', data);
-
-        // Processar dados para o formato esperado pelo Chart.js
-        const labels = data.map(item => item.tipo || 'N/A');
-        const values = data.map(item => item.quantidade || 0);
-
-        this.tiposImoveisChart = new Chart(ctx, {
-            type: 'doughnut',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Quantidade',
-                    data: values,
-                    backgroundColor: [
-                        'rgba(59, 130, 246, 0.8)',
-                        'rgba(16, 185, 129, 0.8)',
-                        'rgba(245, 158, 11, 0.8)',
-                        'rgba(239, 68, 68, 0.8)',
-                        'rgba(139, 92, 246, 0.8)',
-                        'rgba(236, 72, 153, 0.8)',
-                        'rgba(6, 182, 212, 0.8)'
-                    ],
-                    borderColor: 'rgb(255, 255, 255)',
-                    borderWidth: 3,
-                    hoverBorderWidth: 4,
-                    hoverBorderColor: 'rgb(255, 255, 255)',
-                    cutout: '60%'
-                }]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        position: 'right',
-                        labels: {
-                            usePointStyle: true,
-                            padding: 20,
-                            font: {
-                                size: 12,
-                                weight: 'bold'
-                            }
-                        }
-                    },
-                    title: {
-                        display: true,
-                        text: 'Distribuição por Tipo de Imóvel',
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        },
-                        padding: 20
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        callbacks: {
-                            label: function(context) {
-                                const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                                const percentage = ((context.parsed / total) * 100).toFixed(1);
-                                return context.label + ': ' + context.parsed + ' (' + percentage + '%)';
-                            }
-                        }
-                    }
-                }
-            }
-        });
-    }
-
-    renderReceitaProprietariosChart(data) {
-        // Verificar se Chart.js está disponível
-        if (typeof Chart === 'undefined') {
-            console.error('Chart.js não está carregado');
-            return;
-        }
-
-        const ctx = document.getElementById('receita-proprietarios-chart').getContext('2d');
-
-        // Destruir gráfico anterior se existir
-        if (this.receitaProprietariosChart) {
-            console.log('Destruindo gráfico de proprietários anterior');
-            this.receitaProprietariosChart.destroy();
-        }
-
-        // Verificar se o canvas está visível e tem dimensões
-        const canvas = document.getElementById('receita-proprietarios-chart');
-        if (!canvas || canvas.offsetHeight === 0) {
-            console.warn('Canvas de proprietários não está pronto, tentando novamente em 100ms');
-            setTimeout(() => this.renderReceitaProprietariosChart(data), 100);
-            return;
-        }
-
-        console.log('Renderizando gráfico de proprietários com dados:', data);
-
-        // Processar dados para o formato esperado pelo Chart.js
-        const labels = data.map(item => item.proprietario || 'N/A');
-        const values = data.map(item => item.receita_total || 0);
-
-        // Criar gradiente para as barras
-        const gradient = ctx.createLinearGradient(0, 0, 400, 0);
-        gradient.addColorStop(0, 'rgba(16, 185, 129, 0.8)');
-        gradient.addColorStop(1, 'rgba(5, 150, 105, 0.8)');
-
-        this.receitaProprietariosChart = new Chart(ctx, {
-            type: 'bar',
-            data: {
-                labels: labels,
-                datasets: [{
-                    label: 'Receita Total (R$)',
-                    data: values,
-                    backgroundColor: gradient,
-                    borderColor: 'rgb(5, 150, 105)',
-                    borderWidth: 2,
-                    borderRadius: 6,
-                    borderSkipped: false,
-                }]
-            },
-            options: {
-                indexAxis: 'y', // Gráfico horizontal
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: {
-                    legend: {
-                        display: false, // Ocultar legenda para economia de espaço
-                    },
-                    title: {
-                        display: true,
-                        text: 'Top 10 Proprietários por Receita',
-                        font: {
-                            size: 16,
-                            weight: 'bold'
-                        },
-                        padding: {
-                            top: 10,
-                            bottom: 20
-                        }
-                    },
-                    tooltip: {
-                        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-                        titleColor: '#fff',
-                        bodyColor: '#fff',
-                        callbacks: {
-                            label: function(context) {
-                                return 'Receita: R$ ' + context.parsed.x.toLocaleString('pt-BR');
-                            }
-                        }
-                    }
-                },
-                scales: {
-                    x: {
-                        beginAtZero: true,
-                        ticks: {
-                            callback: function(value) {
-                                return 'R$ ' + value.toLocaleString('pt-BR');
-                            },
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            color: 'rgba(0, 0, 0, 0.1)'
-                        }
-                    },
-                    y: {
-                        ticks: {
-                            font: {
-                                size: 11
-                            }
-                        },
-                        grid: {
-                            display: false
-                        }
-                    }
-                },
-                elements: {
-                    bar: {
-                        borderRadius: 6,
-                    }
-                }
-            }
-        });
-    }
-
-    async loadRecentRentals() {
-        try {
-            // Buscar aluguéis recentes via endpoint específico do dashboard
-            const rentals = await this.apiClient.get('/api/dashboard/recent-rentals');
-
-            const container = document.getElementById('alugueis-recentes-table');
-
-            if (this.alugueisTable) {
-                this.alugueisTable.destroy();
-            }
-
-            // Verificar se Handsontable está disponível
-            if (typeof Handsontable === 'undefined') {
-                console.error('Handsontable não está carregado');
-                return;
-            }
-
-            const data = rentals.map(rental => [
-                rental.id,
-                rental.imovel,
-                rental.proprietario,
-                `R$ ${(rental.valor_total || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`,
-                rental.data_referencia,
-                rental.status
-            ]);
-
-            this.alugueisTable = new Handsontable(container, {
-                data: data,
-                colHeaders: ['ID', 'Imóvel', 'Proprietário', 'Valor Total', 'Data Ref.', 'Status'],
-                columns: [
-                    { type: 'text', readOnly: true },
-                    { type: 'text', readOnly: true },
-                    { type: 'text', readOnly: true },
-                    { type: 'text', readOnly: true },
-                    { type: 'text', readOnly: true },
-                    { type: 'text', readOnly: true }
-                ],
-                height: 300,
-                readOnly: true,
-                stretchH: 'all',
-                licenseKey: 'non-commercial-and-evaluation'
-            });
-
-        } catch (error) {
-            console.error('Erro ao carregar aluguéis recentes:', error);
-        }
-    }
 }
 
 // Inicializar quando o DOM estiver carregado
@@ -648,8 +381,8 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log('DOMContentLoaded disparado');
     // Aguardar as bibliotecas externas serem carregadas
     const checkLibraries = () => {
-        console.log('Verificando bibliotecas - Chart:', typeof Chart, 'Handsontable:', typeof Handsontable);
-        if (typeof Chart !== 'undefined' && typeof Handsontable !== 'undefined') {
+        console.log('Verificando bibliotecas - Chart:', typeof Chart);
+        if (typeof Chart !== 'undefined') {
             console.log('Bibliotecas carregadas, aguardando ApiClient...');
             // DashboardManager será inicializado quando apiReady for disparado
             new DashboardManager();
