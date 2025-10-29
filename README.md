@@ -212,6 +212,44 @@ O script irá:
    - Login: `admin` / `123` (auto-login habilitado em desenvolvimento)
    - API Docs: http://localhost:8000/docs
 
+   ## 🧩 Build do CSS (Tailwind)
+
+   > Nota: O projeto foi atualizado para carregar o Tailwind a partir de um arquivo compilado em
+   >`/app/static/css/tailwind.css` (substituindo o carregamento via CDN). Antes de rodar em
+   produção ou em um ambiente sem CDN, gere o arquivo compilado conforme abaixo.
+
+   Opções para gerar o CSS:
+
+   - Local (desenvolvimento):
+
+   ```bash
+   # 1) Instale dependências Node (apenas uma vez)
+   npm install
+
+   # 2) Gere o CSS minificado
+   npm run build:css
+
+   # O artefato será criado em:
+   # ./app/static/css/tailwind.css
+   ```
+
+   - Em CI / Docker (recomendado para produção):
+
+   Recomenda-se adicionar uma etapa ao pipeline de build que execute os mesmos comandos
+   e copie o resultado para a imagem final. Duas opções comuns:
+
+   1) Multi-stage build: usar uma imagem Node para construir os assets e copiar apenas o
+      `tailwind.css` para a imagem Python final (mantém a imagem final pequena).
+
+   2) Fazer o `npm install && npm run build:css` dentro do Dockerfile antes de instalar as
+      dependências Python (mais simples, mas aumenta o tamanho da imagem).
+
+   Se preferir, posso adicionar a etapa de build ao `Dockerfile` usando multi-stage (recomendado).
+
+   Se não gerar o arquivo, a aplicação continuará a funcionar, mas o CSS será carregado em branco
+   ou terá visual diferente (e o aviso sobre CDN em produção permanecerá).
+
+
 ### Com Docker
 
 1. **Execute com Docker Compose**:

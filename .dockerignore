@@ -1,3 +1,27 @@
+node_modules
+dist
+build
+/.venv
+venv
+__pycache__
+.pytest_cache
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+npm-debug.log
+.env
+.env.*
+.cache
+.vscode
+.idea
+/.mypy_cache
+coverage.xml
+.tox
+pip-wheel-metadata
+/.cache
+/.npm
+package-lock.json
 # Git
 .git
 .gitignore

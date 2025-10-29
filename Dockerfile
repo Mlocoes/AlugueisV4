@@ -1,20 +1,33 @@
-# Etapa 1: Builder - Instala as dependências
+# Stage: assets - build frontend assets (Tailwind CSS) using Node
+FROM node:18-alpine as assets
+
+WORKDIR /src
+
+# Copy only what is needed for building the CSS
+COPY package.json package-lock.json* ./
+COPY tailwind.config.js postcss.config.js ./
+COPY src ./src
+
+# Install node deps and build the CSS
+RUN npm ci --no-audit --no-fund || npm install
+RUN npm run build:css
+
+
+# Etapa: Builder - Instala as dependências Python em um venv
 FROM python:3.11-slim as builder
 
 WORKDIR /app
-
-# Instalar dependências de build, se necessário
-# RUN apt-get update && apt-get install -y --no-install-recommends gcc
 
 # Criar um ambiente virtual
 RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
-# Copiar e instalar dependências
+# Copiar e instalar dependências Python
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Etapa 2: Final - Cria a imagem de produção
+
+# Etapa Final - Cria a imagem de produção
 FROM python:3.11-slim
 
 # Instalar cliente PostgreSQL
@@ -30,6 +43,9 @@ ENV PATH="/opt/venv/bin:$PATH"
 
 # Copiar o código da aplicação
 COPY . .
+
+# Copiar o CSS compilado do stage `assets` (se existir)
+COPY --from=assets /src/app/static/css/tailwind.css ./app/static/css/tailwind.css
 
 # Mudar propriedade dos arquivos para o usuário não-root
 RUN chown -R appuser:appuser /app
