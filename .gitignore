@@ -62,3 +62,15 @@ Thumbs.db
 test_*.py
 debug_*.html
 teste_*.xlsx
+
+# Node.js
+node_modules/
+package-lock.json
+npm-debug.log*
+
+# CSS compilado (gerado automaticamente)
+app/static/css/tailwind.css
+
+# Arquivos de processo
+.uvicorn_pid
+.monitor_pid
