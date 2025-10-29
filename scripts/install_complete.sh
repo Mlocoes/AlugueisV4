@@ -52,7 +52,8 @@ if [[ $REPLY =~ ^[Yy]$ ]]; then
     echo "  🗑️  Removendo base de dados existente..."
     rm -f test.db
 
-    echo "  📋 Executando migrações..."
+echo "  📋 Executando migrações..."
+    export PYTHONPATH="$PWD"
     alembic upgrade head
 
     echo "  ✅ Base de dados criada com sucesso!"
@@ -94,6 +95,7 @@ fi
 echo "  👤 Criando usuário administrador..."
 
 # Executar script Python para criar o usuário
+export PYTHONPATH="$PWD"
 if python3 scripts/create_admin_interactive.py --nome "$ADMIN_NOME" --email "$ADMIN_EMAIL" --password "$ADMIN_PASSWORD"; then
     echo ""
     echo "🎉 INSTALAÇÃO CONCLUÍDA COM SUCESSO!"
