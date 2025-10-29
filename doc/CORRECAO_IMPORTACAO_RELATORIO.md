@@ -44,7 +44,7 @@ Todos os locais que usavam parsing manual foram atualizados para usar `self.pars
 - Valores por proprietário
 
 ### 3. **Limpeza de Dados Incorretos**
-- Criado script `clear_incorrect_data.py` para remover registros com valores > R$ 100.000,00
+- Criado script `test_scripts/clear_incorrect_data.py` para remover registros com valores > R$ 100.000,00
 - Removidos **1.330 registros incorretos** do banco de dados
 - Mantidos **140 registros válidos** com valores corretos
 
@@ -79,7 +79,7 @@ Todos os locais que usavam parsing manual foram atualizados para usar `self.pars
 ## 🔧 Arquivos Modificados
 1. `app/services/import_service.py` - Função `parse_valor_monetario` melhorada
 2. `app/services/import_service.py` - Uso da função em todo o código de importação
-3. `clear_incorrect_data.py` - Script de limpeza criado
+3. `test_scripts/clear_incorrect_data.py` - Script de limpeza criado
 4. `test_import_fix.py` - Script de teste criado
 
 ## ✅ Status

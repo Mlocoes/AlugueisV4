@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Auth</title>
+</head>
+<body>
+    <h1>Teste de Autenticação</h1>
+    <button onclick="testLogin()">Login</button>
+    <button onclick="testDashboard()">Dashboard</button>
+    <button onclick="simulateReload()">Simular Reload (F5)</button>
+    <button onclick="clearStorage()">Limpar Storage</button>
+    <div id="result"></div>
+    
+    <script src="http://localhost:8001/static/js/main.js"></script>
+    <script>
+        let api;
+        
+        window.addEventListener('apiReady', (event) => {
+            api = event.detail;
+            document.getElementById('result').innerHTML += '<p>API pronta</p>';
+        });
+        
+        async function testLogin() {
+            try {
+                const result = await api.login('admin', 'admin123');
+                document.getElementById('result').innerHTML += '<p>Login OK: ' + (result.access_token ? 'Token recebido' : 'Erro') + '</p>';
+                document.getElementById('result').innerHTML += '<p>Token no sessionStorage: ' + (sessionStorage.getItem('access_token') ? 'Sim' : 'Não') + '</p>';
+            } catch (e) {
+                document.getElementById('result').innerHTML += '<p>Login erro: ' + e.message + '</p>';
+            }
+        }
+        
+        function testDashboard() {
+            // Simular verificação do dashboard
+            const token = sessionStorage.getItem('access_token');
+            if (!token) {
+                document.getElementById('result').innerHTML += '<p>Dashboard: Redirecionando para login (sem token)</p>';
+            } else {
+                document.getElementById('result').innerHTML += '<p>Dashboard: Token encontrado, continuando</p>';
+            }
+        }
+        
+        function simulateReload() {
+            // Simular reload limpando sessionStorage
+            sessionStorage.clear();
+            document.getElementById('result').innerHTML += '<p>Reload simulado: sessionStorage limpo</p>';
+            document.getElementById('result').innerHTML += '<p>Token após reload: ' + (sessionStorage.getItem('access_token') ? 'Sim' : 'Não') + '</p>';
+        }
+        
+        function clearStorage() {
+            api.clearStoredAuth();
+            document.getElementById('result').innerHTML += '<p>Storage limpo via API</p>';
+            document.getElementById('result').innerHTML += '<p>Token após limpeza: ' + (sessionStorage.getItem('access_token') ? 'Sim' : 'Não') + '</p>';
+        }
+    </script>
+</body>
+</html>
