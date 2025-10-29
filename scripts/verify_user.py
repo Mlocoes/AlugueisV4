@@ -1,3 +1,4 @@
+
 import argparse
 import sys
 import os
@@ -5,7 +6,7 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
 # Adiciona o diretório raiz do projeto ao sys.path
-project_root = os.path.abspath(os.path.dirname(__file__) + '/../')
+project_root = os.path.abspath(os.path.dirname(__file__))
 sys.path.append(project_root)
 
 try:
