@@ -190,7 +190,7 @@ class ParticipacoesManager {
                         renderer: function(instance, td, row, col, prop, value, cellProperties) {
                                 const participacaoId = instance.getDataAtRow(row)[0];
                                 // Obter proprietario do registro para checar permissão
-                                const part = participacoesManager.participacoesData ? participacoesManager.participacoesManager.participacoesData.find(p => p.id === participacaoId) : null;
+                                const part = participacoesManager.participacoesData ? participacoesManager.participacoesData.find(p => p.id === participacaoId) : null;
                                 const ownerId = part ? part.id_proprietario : null;
                                 const isAdmin = participacoesManager.apiClient.isAdmin();
                                 const canEditSet = new Set((participacoesManager.permissions && participacoesManager.permissions.editar) || []);
